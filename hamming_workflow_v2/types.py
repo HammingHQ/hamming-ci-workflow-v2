@@ -36,7 +36,8 @@ class CreateTestRunRequest(BaseModel):
 class TestRunResponse(BaseModel):
     testRunId: str
     resultsUrl: str
-    status: str
+    testCaseRuns: Optional[List[Any]] = []  # Array of test case runs
+    status: Optional[str] = None  # Not returned by API on creation
     message: Optional[str] = None
 
 

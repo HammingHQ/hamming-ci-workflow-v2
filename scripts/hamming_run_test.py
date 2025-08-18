@@ -92,22 +92,13 @@ def run_test(
     # Parse response
     response_data = response.json()
     
-    # Log the raw response to understand the structure
-    logger.info(f"Raw API Response: {json.dumps(response_data, indent=2)}")
+    # Parse the response with the actual API structure
+    test_run_response = TestRunResponse(**response_data)
     
-    # For now, just extract the testRunId and construct a minimal response
-    # We'll update this once we see the actual structure
-    test_run_id = response_data.get("testRunId")
-    if not test_run_id:
-        raise ValueError(f"No testRunId in API response: {response_data}")
-    
-    # Create a response object with defaults for missing fields
-    test_run_response = TestRunResponse(
-        testRunId=test_run_id,
-        resultsUrl=response_data.get("resultsUrl", f"https://app.hamming.ai/test-runs/{test_run_id}"),
-        status=response_data.get("status", "CREATED"),
-        message=response_data.get("message")
-    )
+    # Check if any test cases were found
+    if not test_run_response.testCaseRuns:
+        logger.warning("WARNING: No test cases were found for the specified criteria!")
+        logger.warning("Check that your agent has test cases with the specified tags or IDs")
     
     # Log success
     test_run_url = get_test_run_url(test_run_response.testRunId)
@@ -115,6 +106,7 @@ def run_test(
     logger.info(f"Test Run ID: {test_run_response.testRunId}")
     logger.info(f"Results URL: {test_run_response.resultsUrl}")
     logger.info(f"View in UI: {test_run_url}")
+    logger.info(f"Test cases queued: {len(test_run_response.testCaseRuns)}")
     
     return test_run_response.testRunId
 

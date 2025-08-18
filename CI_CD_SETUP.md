@@ -11,10 +11,17 @@ To use the Hamming CI Workflow v2 in GitHub Actions, you need to configure the f
 
 ### 2. Repository Variables (Settings → Secrets and variables → Actions → Variables)
 
-**Recommended Variables:**
+**For Smoke Tests:**
+```
+SMOKE_TEST_AGENT_ID = your-agent-id-here
+SMOKE_TEST_PHONE_NUMBERS = +12345678901,+10987654321
+SMOKE_TEST_TAGS = tag1,tag2,tag3
+```
+
+**For General Use:**
 ```
 AGENT_ID = your-agent-id-here
-TEST_PHONE_NUMBERS = +12345678901,+10987654321
+PHONE_NUMBERS = +12345678901,+10987654321
 ```
 
 ### 3. Using in Your Workflow
