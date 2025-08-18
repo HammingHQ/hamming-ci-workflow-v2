@@ -136,6 +136,14 @@ jobs:
 4. **Rotate API keys regularly** - Update the secret periodically
 5. **Use environment protection rules** for production deployments
 
+## GitHub Actions Versions
+
+This workflow uses the latest stable versions of GitHub Actions:
+- `actions/checkout@v4`
+- `actions/setup-python@v5`
+- `actions/upload-artifact@v4`
+- `actions/github-script@v7`
+
 ## Troubleshooting
 
 ### Common Issues
