@@ -15,7 +15,7 @@ jobs:
       agent_id: ${{ vars.SMOKE_TEST_AGENT_ID }}  # Repository variable for smoke test
       phone_numbers: ${{ vars.SMOKE_TEST_PHONE_NUMBERS }}  # Repository variable for smoke test
       tag_ids: ${{ vars.SMOKE_TEST_TAGS }}  # Repository variable for smoke test
-      timeout_seconds: "600"
+      timeout_seconds: "900"
       min_score_threshold: "0.7"
     secrets:
       # This must be a repository secret

@@ -24,7 +24,7 @@ class Config:
     
     # Monitoring Configuration
     POLL_INTERVAL_SECONDS = int(os.environ.get("POLL_INTERVAL_SECONDS", "10"))
-    TIMEOUT_SECONDS = int(os.environ.get("TIMEOUT_SECONDS", "600"))
+    TIMEOUT_SECONDS = int(os.environ.get("TIMEOUT_SECONDS", "900"))
     
     @classmethod
     def validate_required(cls):

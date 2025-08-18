@@ -24,7 +24,7 @@ on:
       timeout_seconds:
         required: false
         type: string
-        default: "600"
+        default: "900"
         description: "Maximum time to wait for test completion"
       min_score_threshold:
         required: false

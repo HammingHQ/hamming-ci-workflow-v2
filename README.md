@@ -68,9 +68,9 @@ The reusable workflow accepts these inputs:
 |-------|----------|-------------|---------|
 | `agent_id` | Yes | Agent ID to test | `agent-123` |
 | `phone_numbers` | Yes | Comma-separated phone numbers | `+15551234567` |
-| `tag_ids` | No* | Comma-separated tag IDs | `smoke-test,critical` |
+| `tag_ids` | No* | Comma-separated tag IDs | `cmc220l4i00zsgn0gvqkvpvxh` |
 | `test_case_ids` | No* | Comma-separated test case IDs | `case-1,case-2` |
-| `timeout_seconds` | No | Max wait time (default: 600) | `900` |
+| `timeout_seconds` | No | Max wait time (default: 900) | `1200` |
 | `min_score_threshold` | No | Minimum passing score (default: 0.0) | `0.7` |
 
 \* Either `tag_ids` OR `test_case_ids` must be provided (not both)
