@@ -31,7 +31,8 @@ def wait_for_test_run(test_run_id: str, timeout_seconds: int = None) -> TestRunR
     if timeout_seconds is None:
         timeout_seconds = Config.TIMEOUT_SECONDS
     
-    url = f"{Config.HAMMING_API_BASE_URL}/test-runs/{test_run_id}"
+    status_url = f"{Config.HAMMING_API_BASE_URL}/test-runs/{test_run_id}/status"
+    results_url = f"{Config.HAMMING_API_BASE_URL}/test-runs/{test_run_id}/results"
     headers = Config.get_headers()
     
     start_time = time.time()
@@ -56,43 +57,62 @@ def wait_for_test_run(test_run_id: str, timeout_seconds: int = None) -> TestRunR
             )
         
         try:
-            # Get test run status
-            response = requests.get(url, headers=headers)
+            # Get test run status using the /status endpoint
+            response = requests.get(status_url, headers=headers)
+            if response.status_code == 404:
+                logger.error(f"Test run {test_run_id} not found")
+                return TestRunResults(
+                    testRunId=test_run_id,
+                    status="NOT_FOUND",
+                    calls=[],
+                    summary={"error": "Test run not found"}
+                )
             response.raise_for_status()
-            data = response.json()
+            status_data = response.json()
             
-            current_status = data.get("status", "UNKNOWN")
+            current_status = status_data.get("status", "UNKNOWN")
             
             # Log status changes
             if current_status != last_status:
                 logger.info(f"Test run status: {current_status}")
                 last_status = current_status
             
-            # Check if test is complete
-            if current_status in [
-                TestStatus.FINISHED.value,
-                TestStatus.FAILED.value,
-                TestStatus.SCORING_FAILED.value
-            ]:
+            # Check if test is complete - using the statuses from the reference code
+            if current_status in ["COMPLETED", "FAILED", "CANCELED"]:
                 logger.info(f"Test run completed with status: {current_status}")
                 
-                # Get full results
-                results_url = f"{url}/results"
+                # Get full results using the /results endpoint
                 results_response = requests.get(results_url, headers=headers)
                 results_response.raise_for_status()
                 results_data = results_response.json()
                 
-                return TestRunResults(**results_data)
+                # Map the response to our TestRunResults model
+                return TestRunResults(
+                    testRunId=test_run_id,
+                    status=current_status,
+                    calls=results_data.get("results", []),  # The API returns "results" not "calls"
+                    summary=results_data.get("summary", {}),
+                    totalCalls=len(results_data.get("results", [])),
+                    successfulCalls=sum(1 for r in results_data.get("results", []) if r.get("status") == "COMPLETED"),
+                    failedCalls=sum(1 for r in results_data.get("results", []) if r.get("status") == "FAILED")
+                )
             
             # Still running, log progress if available
-            if current_status == TestStatus.RUNNING.value:
-                completed_calls = data.get("completedCalls", 0)
-                total_calls = data.get("totalCalls", 0)
-                if total_calls > 0:
-                    progress = f" ({completed_calls}/{total_calls} calls completed)"
-                    if completed_calls != data.get("lastLoggedCalls", 0):
-                        logger.info(f"Progress: {progress}")
-                        data["lastLoggedCalls"] = completed_calls
+            if current_status == "RUNNING":
+                # Try to get current results to show progress
+                try:
+                    results_response = requests.get(results_url, headers=headers)
+                    if results_response.status_code == 200:
+                        results_data = results_response.json()
+                        test_case_runs = results_data.get("results", [])
+                        if test_case_runs:
+                            status_counts = {}
+                            for run in test_case_runs:
+                                run_status = run.get("status", "UNKNOWN")
+                                status_counts[run_status] = status_counts.get(run_status, 0) + 1
+                            logger.info(f"Progress: {len(test_case_runs)} test cases - {status_counts}")
+                except Exception as e:
+                    logger.debug(f"Could not fetch progress: {e}")
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Error checking test run status: {e}")
@@ -128,8 +148,8 @@ def main():
         # Output results as JSON for downstream processing
         print(results.model_dump_json(indent=2))
         
-        # Exit with appropriate code
-        if results.status in [TestStatus.FINISHED.value, "FINISHED"]:
+        # Exit with appropriate code - "COMPLETED" is the success status from the new API
+        if results.status in ["COMPLETED", TestStatus.FINISHED.value, "FINISHED"]:
             sys.exit(0)
         else:
             logger.error(f"Test run failed with status: {results.status}")
