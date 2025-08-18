@@ -1,0 +1,22 @@
+name: Smoke Test Example
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  smoke-test:
+    uses: ./.github/workflows/hamming_run_test.yml
+    with:
+      # These values can be hardcoded or use repository variables
+      agent_id: ${{ vars.AGENT_ID }}  # Repository variable
+      phone_numbers: ${{ vars.TEST_PHONE_NUMBERS }}  # Repository variable
+      tag_ids: "smoke-test"  # Hardcoded
+      timeout_seconds: "600"
+      min_score_threshold: "0.7"
+    secrets:
+      # This must be a repository secret
+      HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}

@@ -1,0 +1,137 @@
+name: Hamming Run Test
+
+on:
+  workflow_call:
+    inputs:
+      agent_id:
+        required: true
+        type: string
+        description: "The agent ID to test"
+      phone_numbers:
+        required: true
+        type: string
+        description: "Comma-separated phone numbers to call"
+      # Mutually exclusive selection methods
+      tag_ids:
+        required: false
+        type: string
+        description: "Comma-separated tag IDs (use this OR test_case_ids)"
+      test_case_ids:
+        required: false
+        type: string
+        description: "Comma-separated test case IDs (use this OR tag_ids)"
+      # Optional parameters
+      timeout_seconds:
+        required: false
+        type: string
+        default: "600"
+        description: "Maximum time to wait for test completion"
+      min_score_threshold:
+        required: false
+        type: string
+        default: "0.0"
+        description: "Minimum score threshold for passing"
+    secrets:
+      HAMMING_API_KEY:
+        required: true
+        description: "Hamming API key for authentication"
+
+jobs:
+  run-test:
+    runs-on: ubuntu-latest
+    outputs:
+      test_run_id: ${{ steps.run_test.outputs.test_run_id }}
+      status: ${{ steps.check_results.outcome }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: HammingHQ/hamming-ci-workflow-v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate inputs
+        run: |
+          if [ -n "${{ inputs.tag_ids }}" ] && [ -n "${{ inputs.test_case_ids }}" ]; then
+            echo "Error: Cannot specify both tag_ids and test_case_ids"
+            exit 1
+          fi
+          if [ -z "${{ inputs.tag_ids }}" ] && [ -z "${{ inputs.test_case_ids }}" ]; then
+            echo "Error: Must specify either tag_ids or test_case_ids"
+            exit 1
+          fi
+
+      - name: Run Hamming test
+        id: run_test
+        env:
+          HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
+          AGENT_ID: ${{ inputs.agent_id }}
+          PHONE_NUMBERS: ${{ inputs.phone_numbers }}
+          TAG_IDS: ${{ inputs.tag_ids }}
+          TEST_CASE_IDS: ${{ inputs.test_case_ids }}
+        run: | 
+          output=$(python scripts/hamming_run_test.py)
+          echo "test_run_id=$output" >> $GITHUB_OUTPUT
+          echo "Test Run ID: $output"
+
+      - name: Wait for test to complete
+        id: wait_for_test
+        env:
+          HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
+          TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
+        run: |
+          python scripts/hamming_wait_test_run.py ${{ steps.run_test.outputs.test_run_id }} > results.json
+          echo "Test run completed"
+          cat results.json
+
+      - name: Check test results
+        id: check_results
+        env:
+          MIN_SCORE_THRESHOLD: ${{ inputs.min_score_threshold }}
+        run: |
+          cat results.json | python scripts/hamming_check_results.py
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ steps.run_test.outputs.test_run_id }}
+          path: results.json
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('results.json', 'utf8'));
+            const testRunId = '${{ steps.run_test.outputs.test_run_id }}';
+            const status = '${{ steps.check_results.outcome }}';
+            
+            const totalCalls = results.calls ? results.calls.length : 0;
+            const passedCalls = results.calls ? results.calls.filter(c => c.status === 'ended').length : 0;
+            
+            const statusEmoji = status === 'success' ? '✅' : '❌';
+            const comment = `## ${statusEmoji} Hamming Voice Test Results
+            
+            **Test Run ID:** ${testRunId}
+            **Status:** ${status === 'success' ? 'PASSED' : 'FAILED'}
+            **Calls:** ${passedCalls}/${totalCalls} completed successfully
+            
+            [View detailed results](${results.resultsUrl || 'https://app.hamming.ai/test-runs/' + testRunId})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
