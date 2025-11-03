@@ -8,7 +8,6 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hamming_sdk import HammingClient
-from hamming_sdk.generated_client.models import TestRunsTestInboundAgentRequest
 from hamming_workflow_v2.config import Config
 from hamming_workflow_v2.utils import (
     parse_comma_separated,
@@ -61,15 +60,17 @@ def run_test(
     client = HammingClient(api_key=Config.HAMMING_API_KEY)
 
     try:
-        # Build request object for SDK
-        request = TestRunsTestInboundAgentRequest(
-            agent_id=agent_id,
-            phone_numbers=phone_numbers,
-            test_configurations=test_configurations
-        )
+        # Build request body
+        request_body = {
+            "agentId": agent_id,
+            "phoneNumbers": phone_numbers,
+            "testConfigurations": test_configurations
+        }
 
         # Call SDK method to create test run
-        response = client.test_runs.test_runs_test_inbound_agent(request)
+        response = client.test_runs.test_runs_test_inbound_agent(
+            test_runs_test_inbound_agent_request=request_body
+        )
 
         # Check if any test cases were found
         if not response.test_case_runs:
