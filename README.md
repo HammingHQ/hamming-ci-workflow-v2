@@ -202,11 +202,13 @@ The workflow sends requests in this format:
 {
   "agentId": "your-agent-id",
   "phoneNumbers": ["+15551234567"],
-  "configurations": [
+  "testConfigurations": [
     {"tagId": "your-tag-id"}  // or {"testCaseId": "test-case-id"}
   ]
 }
 ```
+
+**Note:** The API documentation examples show `configurations`, but the actual API expects `testConfigurations`.
 
 ## Troubleshooting
 
@@ -236,10 +238,10 @@ Key differences from hamming-ci-workflow v1:
 
 | Feature | v1 | v2 |
 |---------|----|----|
-| Test Selection | `dataset_id` | `configurations` array with `tagId` or `testCaseId` |
+| Test Selection | `dataset_id` | `testConfigurations` array with `tagId` or `testCaseId` |
 | Phone Numbers | Single `to_number` | Multiple `phone_numbers` array |
 | API Endpoint | `/voice-agent/{id}/run` | `/test-runs/test-inbound-agent` |
-| Request Format | Flat parameters | Structured `configurations` array |
+| Request Format | Flat parameters | Structured `testConfigurations` array |
 | Validation | Minimal | Comprehensive pre-execution |
 | Response | `experiment_id` | Full `testRunId` and results |
 

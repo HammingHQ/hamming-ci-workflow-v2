@@ -52,14 +52,14 @@ def run_test(
         "phoneNumbers": phone_numbers
     }
 
-    # Build configurations array - API requires this format
+    # Build testConfigurations array - API requires this format
     if tag_ids:
-        request_data["configurations"] = [
+        request_data["testConfigurations"] = [
             {"tagId": tag_id} for tag_id in tag_ids
         ]
         logger.info(f"Running test with tags: {tag_ids}")
     elif test_case_ids:
-        request_data["configurations"] = [
+        request_data["testConfigurations"] = [
             {"testCaseId": test_id} for test_id in test_case_ids
         ]
         logger.info(f"Running test with specific test cases: {test_case_ids}")

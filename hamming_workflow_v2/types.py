@@ -30,7 +30,7 @@ class TestConfiguration(BaseModel):
 class CreateTestRunRequest(BaseModel):
     agentId: str
     phoneNumbers: List[str]
-    configurations: List[TestConfiguration]  # Array of test case/tag configurations
+    testConfigurations: List[TestConfiguration]  # Array of test case/tag configurations
     name: Optional[str] = None
     description: Optional[str] = None
     testRunOverrides: Optional[Dict[str, Any]] = None
