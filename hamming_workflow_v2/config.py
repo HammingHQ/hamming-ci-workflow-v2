@@ -10,7 +10,6 @@ class Config:
 
     # API Configuration
     HAMMING_API_KEY = os.environ.get("HAMMING_API_KEY")
-    # Note: SDK handles base URL automatically, but keep for backward compatibility
     HAMMING_API_BASE_URL = os.environ.get("HAMMING_API_BASE_URL", "https://app.hamming.ai/api/rest")
 
     # Agent Configuration
@@ -46,3 +45,11 @@ class Config:
 
         if errors:
             raise ValueError(f"Configuration errors: {'; '.join(errors)}")
+
+    @classmethod
+    def get_headers(cls):
+        """Get headers for API requests."""
+        return {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {cls.HAMMING_API_KEY}"
+        }

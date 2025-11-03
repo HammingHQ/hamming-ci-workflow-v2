@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import requests
 import logging
+import json
 import sys
 from typing import Optional, List
 
@@ -7,7 +9,6 @@ from typing import Optional, List
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hamming_sdk import HammingClient
 from hamming_workflow_v2.config import Config
 from hamming_workflow_v2.utils import (
     parse_comma_separated,
@@ -27,7 +28,7 @@ def run_test(
     test_case_ids: Optional[List[str]] = None
 ) -> str:
     """
-    Create and run a test using the Hamming SDK.
+    Create and run a test using the Hamming API.
 
     Args:
         agent_id: The agent ID to test
@@ -44,54 +45,69 @@ def run_test(
     # Format phone numbers
     phone_numbers = format_phone_numbers(phone_numbers)
 
-    # Build test configurations array
-    test_configurations = []
+    # Build request body
+    request_data = {
+        "agentId": agent_id,
+        "phoneNumbers": phone_numbers
+    }
+
+    # Build testConfigurations array - API requires this format
     if tag_ids:
-        test_configurations = [{"tagId": tag_id} for tag_id in tag_ids]
+        request_data["testConfigurations"] = [
+            {"tagId": tag_id} for tag_id in tag_ids
+        ]
         logger.info(f"Running test with tags: {tag_ids}")
     elif test_case_ids:
-        test_configurations = [{"testCaseId": test_id} for test_id in test_case_ids]
+        request_data["testConfigurations"] = [
+            {"testCaseId": test_id} for test_id in test_case_ids
+        ]
         logger.info(f"Running test with specific test cases: {test_case_ids}")
+
+    # Make API request
+    url = f"{Config.HAMMING_API_BASE_URL}/test-runs/test-inbound-agent"
+    headers = Config.get_headers()
 
     logger.info(f"Creating test run for agent {agent_id}")
     logger.info(f"Phone numbers: {phone_numbers}")
 
-    # Initialize SDK client
-    client = HammingClient(api_key=Config.HAMMING_API_KEY)
-
     try:
-        # Build request body
-        request_body = {
-            "agentId": agent_id,
-            "phoneNumbers": phone_numbers,
-            "testConfigurations": test_configurations
-        }
-
-        # Call SDK method to create test run
-        response = client.test_runs.test_runs_test_inbound_agent(
-            test_runs_test_inbound_agent_request=request_body
+        response = requests.post(
+            url,
+            json=request_data,
+            headers=headers
         )
-
-        # Check if any test cases were found
-        if not response.test_case_runs:
-            logger.warning("WARNING: No test cases were found for the specified criteria!")
-            logger.warning("Check that your agent has test cases with the specified tags or IDs")
-
-        # Log success
-        test_run_url = get_test_run_url(response.test_run_id)
-        logger.info(f"Test run created successfully")
-        logger.info(f"Test Run ID: {response.test_run_id}")
-        logger.info(f"Results URL: {response.results_url}")
-        logger.info(f"View in UI: {test_run_url}")
-        logger.info(f"Test cases queued: {len(response.test_case_runs)}")
-
-        return response.test_run_id
-
-    except Exception as e:
-        logger.error(f"Failed to create test run: {e}")
-        import traceback
-        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"API request failed: {e}")
+        if response.text:
+            logger.error(f"Response body: {response.text}")
         raise
+
+    # Parse response
+    response_data = response.json()
+
+    # Extract test run ID
+    test_run_id = response_data.get("testRunId")
+    if not test_run_id:
+        logger.error(f"No testRunId in response: {response_data}")
+        raise ValueError("API response missing testRunId")
+
+    # Check if any test cases were found
+    test_case_runs = response_data.get("testCaseRuns", [])
+    if not test_case_runs:
+        logger.warning("WARNING: No test cases were found for the specified criteria!")
+        logger.warning("Check that your agent has test cases with the specified tags or IDs")
+
+    # Log success
+    test_run_url = get_test_run_url(test_run_id)
+    results_url = response_data.get("resultsUrl", "")
+    logger.info(f"Test run created successfully")
+    logger.info(f"Test Run ID: {test_run_id}")
+    logger.info(f"Results URL: {results_url}")
+    logger.info(f"View in UI: {test_run_url}")
+    logger.info(f"Test cases queued: {len(test_case_runs)}")
+
+    return test_run_id
 
 
 def main():
@@ -125,8 +141,6 @@ def main():
 
     except Exception as e:
         logger.error(f"Failed to create test run: {e}")
-        import traceback
-        traceback.print_exc()
         sys.exit(1)
 
 
