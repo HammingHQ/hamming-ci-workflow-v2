@@ -45,8 +45,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          repository: HammingHQ/hamming-ci-workflow-v2
 
       - name: Set up Python
         uses: actions/setup-python@v5
