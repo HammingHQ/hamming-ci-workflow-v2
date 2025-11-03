@@ -170,7 +170,7 @@ export HAMMING_API_KEY=sk-***
 ```bash
 pip install -r requirements.txt
 # Install Hamming Python SDK (requires API key)
-pip install "https://app.hamming.ai/api/sdk/python/hamming_sdk-latest-py3-none-any.whl?key=$HAMMING_API_KEY"
+pip install "https://app.hamming.ai/api/sdk/python/hamming_sdk-0.1.22-py3-none-any.whl?key=$HAMMING_API_KEY"
 ```
 
 4. Copy and configure environment:
