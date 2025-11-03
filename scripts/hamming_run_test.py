@@ -10,6 +10,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hamming_workflow_v2.config import Config
+from hamming_workflow_v2.types import (
+    CreateTestRunRequest,
+    TestConfiguration,
+    TestRunResponse
+)
 from hamming_workflow_v2.utils import (
     parse_comma_separated,
     validate_selection_method,
@@ -45,23 +50,21 @@ def run_test(
     # Format phone numbers
     phone_numbers = format_phone_numbers(phone_numbers)
 
-    # Build request body
-    request_data = {
-        "agentId": agent_id,
-        "phoneNumbers": phone_numbers
-    }
-
-    # Build testConfigurations array - API requires this format
+    # Build testConfigurations array
+    test_configurations = []
     if tag_ids:
-        request_data["testConfigurations"] = [
-            {"tagId": tag_id} for tag_id in tag_ids
-        ]
+        test_configurations = [TestConfiguration(tagId=tag_id) for tag_id in tag_ids]
         logger.info(f"Running test with tags: {tag_ids}")
     elif test_case_ids:
-        request_data["testConfigurations"] = [
-            {"testCaseId": test_id} for test_id in test_case_ids
-        ]
+        test_configurations = [TestConfiguration(testCaseId=test_id) for test_id in test_case_ids]
         logger.info(f"Running test with specific test cases: {test_case_ids}")
+
+    # Create request object for validation
+    request_obj = CreateTestRunRequest(
+        agentId=agent_id,
+        phoneNumbers=phone_numbers,
+        testConfigurations=test_configurations
+    )
 
     # Make API request
     url = f"{Config.HAMMING_API_BASE_URL}/test-runs/test-inbound-agent"
@@ -73,7 +76,7 @@ def run_test(
     try:
         response = requests.post(
             url,
-            json=request_data,
+            json=request_obj.model_dump(exclude_none=True),
             headers=headers
         )
         response.raise_for_status()
@@ -83,31 +86,24 @@ def run_test(
             logger.error(f"Response body: {response.text}")
         raise
 
-    # Parse response
+    # Parse response with Pydantic model
     response_data = response.json()
-
-    # Extract test run ID
-    test_run_id = response_data.get("testRunId")
-    if not test_run_id:
-        logger.error(f"No testRunId in response: {response_data}")
-        raise ValueError("API response missing testRunId")
+    test_run_response = TestRunResponse(**response_data)
 
     # Check if any test cases were found
-    test_case_runs = response_data.get("testCaseRuns", [])
-    if not test_case_runs:
+    if not test_run_response.testCaseRuns:
         logger.warning("WARNING: No test cases were found for the specified criteria!")
         logger.warning("Check that your agent has test cases with the specified tags or IDs")
 
     # Log success
-    test_run_url = get_test_run_url(test_run_id)
-    results_url = response_data.get("resultsUrl", "")
+    test_run_url = get_test_run_url(test_run_response.testRunId)
     logger.info(f"Test run created successfully")
-    logger.info(f"Test Run ID: {test_run_id}")
-    logger.info(f"Results URL: {results_url}")
+    logger.info(f"Test Run ID: {test_run_response.testRunId}")
+    logger.info(f"Results URL: {test_run_response.resultsUrl}")
     logger.info(f"View in UI: {test_run_url}")
-    logger.info(f"Test cases queued: {len(test_case_runs)}")
+    logger.info(f"Test cases queued: {len(test_run_response.testCaseRuns)}")
 
-    return test_run_id
+    return test_run_response.testRunId
 
 
 def main():

@@ -10,6 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hamming_workflow_v2.config import Config
+from hamming_workflow_v2.types import TestRunResults
 from hamming_workflow_v2.utils import get_test_run_url
 
 logging.basicConfig(level=logging.INFO)

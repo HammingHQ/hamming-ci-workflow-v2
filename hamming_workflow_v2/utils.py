@@ -8,6 +8,12 @@ def get_test_run_url(test_run_id: str) -> str:
     return f"{base_url}/test-runs/{test_run_id}"
 
 
+def get_test_case_url(test_case_id: str) -> str:
+    """Generate the URL for viewing a test case in the Hamming UI."""
+    base_url = os.environ.get("HAMMING_UI_BASE_URL", "https://app.hamming.ai")
+    return f"{base_url}/test-cases/{test_case_id}"
+
+
 def parse_comma_separated(value: Optional[str]) -> Optional[List[str]]:
     """Parse a comma-separated string into a list of strings."""
     if not value:

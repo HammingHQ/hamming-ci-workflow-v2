@@ -7,6 +7,9 @@ import logging
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from hamming_workflow_v2.types import TestRunResults
+from hamming_workflow_v2.utils import get_test_case_url
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -27,15 +30,21 @@ def check_results(
     Returns:
         True if all thresholds pass, False otherwise
     """
-    summary = results_dict.get("summary", {})
-    results = results_dict.get("results", [])
+    # Parse with Pydantic model for type safety
+    try:
+        results_obj = TestRunResults(**results_dict)
+    except Exception as e:
+        logger.error(f"Failed to parse test results: {e}")
+        return False
+
+    summary = results_obj.summary
+    results = results_obj.results
 
     all_checks_passed = True
 
     # Check 1: Overall test run status
-    status = summary.get("status", "UNKNOWN")
-    if status not in ["COMPLETED", "FINISHED"]:
-        logger.error(f"✗ Test run did not complete successfully. Status: {status}")
+    if summary.status not in ["COMPLETED", "FINISHED"]:
+        logger.error(f"✗ Test run did not complete successfully. Status: {summary.status}")
         return False
 
     total_tests = len(results)
@@ -44,7 +53,7 @@ def check_results(
         return False
 
     # Check 2: Test case pass rate
-    passed_tests = sum(1 for r in results if r.get("status") == "PASSED")
+    passed_tests = sum(1 for r in results if r.status == "PASSED")
     test_pass_rate = passed_tests / total_tests
 
     logger.info(f"\n{'='*60}")
@@ -63,10 +72,10 @@ def check_results(
     passed_assertions = 0
 
     for result in results:
-        assertion_results = result.get("assertionResults", [])
+        assertion_results = result.assertionResults or []
         for assertion in assertion_results:
             total_assertions += 1
-            if assertion.get("status") == "PASSED":
+            if assertion.status == "PASSED":
                 passed_assertions += 1
 
     if total_assertions > 0:
@@ -89,20 +98,20 @@ def check_results(
     logger.info(f"\n{'='*60}")
     logger.info(f"DETAILED TEST RESULTS:")
     for result in results:
-        test_id = result.get("id", "unknown")
-        test_case_id = result.get("testCaseId", "unknown")
-        test_status = result.get("status", "UNKNOWN")
+        test_case_url = get_test_case_url(result.testCaseId)
 
-        if test_status == "PASSED":
-            logger.info(f"  ✓ {test_id} (testCase: {test_case_id}): PASSED")
+        if result.status == "PASSED":
+            logger.info(f"  ✓ {result.id} (testCase: {result.testCaseId}): PASSED")
+            logger.info(f"      View test case: {test_case_url}")
         else:
-            logger.error(f"  ✗ {test_id} (testCase: {test_case_id}): {test_status}")
+            logger.error(f"  ✗ {result.id} (testCase: {result.testCaseId}): {result.status}")
+            logger.error(f"      View test case: {test_case_url}")
 
             # Show failed assertions
-            assertion_results = result.get("assertionResults", [])
+            assertion_results = result.assertionResults or []
             for assertion in assertion_results:
-                if assertion.get("status") == "FAILED":
-                    logger.error(f"      └─ {assertion.get('assertionName')}: {assertion.get('reason')}")
+                if assertion.status == "FAILED":
+                    logger.error(f"      └─ {assertion.assertionName}: {assertion.reason}")
 
     logger.info(f"{'='*60}\n")
 
