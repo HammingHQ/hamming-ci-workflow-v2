@@ -19,7 +19,9 @@ class PersonaOverride(BaseModel):
 
 
 class TestConfiguration(BaseModel):
-    testCaseId: str
+    # Must have either testCaseId OR tagId (mutually exclusive)
+    testCaseId: Optional[str] = None
+    tagId: Optional[str] = None
     overrides: Optional[Dict[str, Any]] = None
     scenarioFacts: Optional[Dict[str, Any]] = None
     persona: Optional[PersonaOverride] = None
@@ -28,9 +30,15 @@ class TestConfiguration(BaseModel):
 class CreateTestRunRequest(BaseModel):
     agentId: str
     phoneNumbers: List[str]
-    # Mutually exclusive selection methods
-    tagIds: Optional[List[str]] = None
-    testConfigurations: Optional[List[TestConfiguration]] = None
+    configurations: List[TestConfiguration]  # Array of test case/tag configurations
+    name: Optional[str] = None
+    description: Optional[str] = None
+    testRunOverrides: Optional[Dict[str, Any]] = None
+    fromNumbers: Optional[List[str]] = None
+    useDifferentFromNumbers: Optional[bool] = None
+    samplingCount: Optional[int] = None
+    assertionSelectionMode: Optional[str] = None
+    selectedAssertionIds: Optional[List[str]] = None
 
 
 class TestRunResponse(BaseModel):

@@ -191,9 +191,22 @@ python scripts/hamming_wait_test_run.py <test-run-id> | python scripts/hamming_c
 
 This workflow uses the following Hamming API endpoints:
 
-- `POST /api/rest/test-runs/test-inbound-agent` - Create test run
+- `POST /api/rest/test-runs/test-inbound-agent` - Create test run with configurations array
 - `GET /api/rest/test-runs/{id}/status` - Check test run status
 - `GET /api/rest/test-runs/{id}/results` - Get test results
+
+### API Request Format
+
+The workflow sends requests in this format:
+```json
+{
+  "agentId": "your-agent-id",
+  "phoneNumbers": ["+15551234567"],
+  "configurations": [
+    {"tagId": "your-tag-id"}  // or {"testCaseId": "test-case-id"}
+  ]
+}
+```
 
 ## Troubleshooting
 
@@ -223,11 +236,12 @@ Key differences from hamming-ci-workflow v1:
 
 | Feature | v1 | v2 |
 |---------|----|----|
-| Test Selection | `dataset_id` | `tag_ids` or `test_case_ids` |
-| Phone Numbers | Single `to_number` | Multiple `phone_numbers` |
+| Test Selection | `dataset_id` | `configurations` array with `tagId` or `testCaseId` |
+| Phone Numbers | Single `to_number` | Multiple `phone_numbers` array |
 | API Endpoint | `/voice-agent/{id}/run` | `/test-runs/test-inbound-agent` |
+| Request Format | Flat parameters | Structured `configurations` array |
 | Validation | Minimal | Comprehensive pre-execution |
-| Response | `experiment_id` | Full test run details |
+| Response | `experiment_id` | Full `testRunId` and results |
 
 ## Contributing
 

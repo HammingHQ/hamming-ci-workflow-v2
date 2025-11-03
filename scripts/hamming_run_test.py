@@ -10,21 +10,16 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hamming_workflow_v2.config import Config
-from hamming_workflow_v2.types import CreateTestRunRequest, TestRunResponse, TestConfiguration
+from hamming_workflow_v2.types import CreateTestRunRequest, TestRunResponse
 from hamming_workflow_v2.utils import (
-    parse_comma_separated, 
-    validate_selection_method, 
+    parse_comma_separated,
+    validate_selection_method,
     format_phone_numbers,
     get_test_run_url
 )
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def create_test_configurations(test_case_ids: List[str]) -> List[TestConfiguration]:
-    """Create test configurations from test case IDs."""
-    return [TestConfiguration(testCaseId=test_id) for test_id in test_case_ids]
 
 
 def run_test(
@@ -56,12 +51,15 @@ def run_test(
         "agentId": agent_id,
         "phoneNumbers": phone_numbers
     }
-    
+
+    # Build configurations array - API requires this format
     if tag_ids:
-        request_data["tagIds"] = tag_ids
+        request_data["configurations"] = [
+            {"tagId": tag_id} for tag_id in tag_ids
+        ]
         logger.info(f"Running test with tags: {tag_ids}")
     elif test_case_ids:
-        request_data["testConfigurations"] = [
+        request_data["configurations"] = [
             {"testCaseId": test_id} for test_id in test_case_ids
         ]
         logger.info(f"Running test with specific test cases: {test_case_ids}")
