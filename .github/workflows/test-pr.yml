@@ -12,6 +12,7 @@ jobs:
       phone_numbers: ${{ vars.SMOKE_TEST_PHONE_NUMBERS }}
       tag_ids: ${{ vars.SMOKE_TEST_TAGS }}
       timeout_seconds: "900"
-      min_score_threshold: "0.7"
+      min_test_pass_rate: "0.8"
+      min_assertion_pass_rate: "0.9"
     secrets:
       HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
