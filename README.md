@@ -10,6 +10,7 @@ A GitHub Actions workflow for running Hamming voice agent tests in CI/CD pipelin
 - 📊 **Detailed results** - Get comprehensive test results with scores and transcripts
 - 🔄 **GitHub Actions integration** - Reusable workflows for easy CI/CD setup
 - 🚦 **PR comments** - Automatic test results posted to pull requests
+- 🐍 **Official Python SDK** - Uses Hamming's official Python SDK for type safety and reliability
 
 ## Quick Start
 
@@ -160,16 +161,25 @@ git clone https://github.com/HammingHQ/hamming-ci-workflow-v2.git
 cd hamming-ci-workflow-v2
 ```
 
-2. Install dependencies:
+2. Set your Hamming API key (required for SDK installation):
 ```bash
-pip install -r requirements.txt
+export HAMMING_API_KEY=sk-***
 ```
 
-3. Copy and configure environment:
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+# Install Hamming Python SDK (requires API key)
+pip install "https://app.hamming.ai/api/sdk/python/hamming_sdk-latest-py3-none-any.whl?key=$HAMMING_API_KEY"
+```
+
+4. Copy and configure environment:
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
 ```
+
+**Note**: The Hamming SDK requires your API key during installation. The SDK is not available on PyPI and must be installed directly from the Hamming API URL.
 
 ### Running Scripts Locally
 
