@@ -1,0 +1,17 @@
+name: Test PR
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    uses: ./.github/workflows/hamming_run_test.yml
+    with:
+      agent_id: ${{ vars.SMOKE_TEST_AGENT_ID }}
+      phone_numbers: ${{ vars.SMOKE_TEST_PHONE_NUMBERS }}
+      tag_ids: ${{ vars.SMOKE_TEST_TAGS }}
+      timeout_seconds: "900"
+      min_score_threshold: "0.7"
+    secrets:
+      HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
