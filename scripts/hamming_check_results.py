@@ -17,61 +17,68 @@ logger = logging.getLogger(__name__)
 def check_results(results: TestRunResults, min_score_threshold: float = 0.0) -> bool:
     """
     Check test run results and determine if they pass.
-    
+
     Args:
         results: The test run results to check
         min_score_threshold: Minimum score threshold for passing (default: 0.0)
-    
+
     Returns:
         True if all checks pass, False otherwise
     """
     all_passed = True
-    
+
     # Check overall status
-    if results.status != "FINISHED":
+    if results.status not in ["COMPLETED", "FINISHED"]:
         logger.error(f"Test run did not complete successfully. Status: {results.status}")
         all_passed = False
-    
-    # Check each call
+
+    # Check each test case result
     for call in results.calls:
         call_passed = True
-        
-        # Check call status
-        if call.status != "ended":
-            logger.error(f"Call {call.id} has status '{call.status}', expected 'ended'")
+
+        # Check test case status (PASSED/FAILED/PENDING/ERROR)
+        if call.status not in ["PASSED"]:
+            logger.error(f"Test case {call.id} (testCaseId: {call.testCaseId}) has status '{call.status}'")
             call_passed = False
             all_passed = False
-        
-        # Check scores
-        for score_name, score in call.scores.items():
-            if score.value <= min_score_threshold:
-                logger.error(
-                    f"Call {call.id} failed score '{score_name}': {score.value} "
-                    f"(threshold: {min_score_threshold})"
-                )
-                call_passed = False
-                all_passed = False
-            else:
-                logger.info(f"Call {call.id} passed score '{score_name}': {score.value}")
-        
+
+        # Check assertions
+        if call.assertionResults:
+            for assertion in call.assertionResults:
+                if assertion.status == "FAILED":
+                    logger.error(
+                        f"Test case {call.id} failed assertion '{assertion.assertionName}': {assertion.reason}"
+                    )
+                    call_passed = False
+                    all_passed = False
+                elif assertion.status == "PASSED":
+                    logger.info(f"Test case {call.id} passed assertion '{assertion.assertionName}'")
+                elif assertion.status == "ERROR":
+                    logger.error(f"Test case {call.id} error in assertion '{assertion.assertionName}': {assertion.reason}")
+                    call_passed = False
+                    all_passed = False
+
+        # Log interactivity score if available
+        if call.metrics and hasattr(call.metrics, 'interactivityScore') and call.metrics.interactivityScore is not None:
+            logger.info(f"Test case {call.id} interactivity score: {call.metrics.interactivityScore}")
+
         if call_passed:
-            logger.info(f"Call {call.id} to {call.phoneNumber} PASSED all checks")
+            logger.info(f"Test case {call.id} (testCaseId: {call.testCaseId}) PASSED all checks")
         else:
-            logger.error(f"Call {call.id} to {call.phoneNumber} FAILED")
-    
+            logger.error(f"Test case {call.id} (testCaseId: {call.testCaseId}) FAILED")
+
     # Log summary
     if results.summary:
         logger.info(f"Test Summary: {json.dumps(results.summary, indent=2)}")
-    
+
     # Log final result
     total_calls = len(results.calls)
     if all_passed:
-        logger.info(f"✓ All {total_calls} calls passed successfully")
+        logger.info(f"✓ All {total_calls} test cases passed successfully")
     else:
-        failed_calls = sum(1 for call in results.calls if call.status != "ended" or 
-                          any(score.value <= min_score_threshold for score in call.scores.values()))
-        logger.error(f"✗ {failed_calls}/{total_calls} calls failed")
-    
+        failed_calls = sum(1 for call in results.calls if call.status != "PASSED")
+        logger.error(f"✗ {failed_calls}/{total_calls} test cases failed")
+
     return all_passed
 
 

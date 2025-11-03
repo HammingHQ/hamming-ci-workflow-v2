@@ -49,30 +49,61 @@ class TestRunResponse(BaseModel):
     message: Optional[str] = None
 
 
-class Score(BaseModel):
-    value: float
-    details: Optional[Dict[str, Any]] = None
+class AssertionResult(BaseModel):
+    assertionId: str
+    assertionName: str
+    status: str  # PASSED, FAILED, ERROR
+    reason: Optional[str] = None
+
+
+class Metrics(BaseModel):
+    latencyP50: Optional[float] = None
+    latencyP90: Optional[float] = None
+    latencyP95: Optional[float] = None
+    latencyMax: Optional[float] = None
+    userInterruptionCount: Optional[int] = None
+    assistantInterruptionCount: Optional[int] = None
+    userTalkRatio: Optional[float] = None
+    callDuration: Optional[float] = None
+    userSpeakingDuration: Optional[float] = None
+    assistantSpeakingDuration: Optional[float] = None
+    interactivityScore: Optional[float] = None
+    assistantTimeToFirstWord: Optional[float] = None
+
+
+class Transcript(BaseModel):
+    messages: Optional[List[Dict[str, Any]]] = None
 
 
 class CallResult(BaseModel):
     id: str
-    status: str
-    phoneNumber: str
     testCaseId: str
-    scores: Dict[str, Score]
-    transcript: Optional[str] = None
-    duration: Optional[int] = None
+    status: str  # PASSED, FAILED, PENDING, ERROR
+    durationSeconds: Optional[float] = None
     recordingUrl: Optional[str] = None
+    transcriptionDataUrl: Optional[str] = None
+    transcript: Optional[Transcript] = None
+    assertionResults: Optional[List[AssertionResult]] = None
+    metrics: Optional[Metrics] = None
 
 
 class TestRunResults(BaseModel):
-    testRunId: str
-    status: str
-    calls: List[CallResult]
     summary: Optional[Dict[str, Any]] = None
-    totalCalls: Optional[int] = None
-    successfulCalls: Optional[int] = None
-    failedCalls: Optional[int] = None
+    results: List[CallResult]
+
+    # Computed properties for backward compatibility
+    @property
+    def testRunId(self) -> str:
+        return self.summary.get("id", "") if self.summary else ""
+
+    @property
+    def status(self) -> str:
+        return self.summary.get("status", "") if self.summary else ""
+
+    @property
+    def calls(self) -> List[CallResult]:
+        """Alias for results for backward compatibility"""
+        return self.results
 
 
 class ErrorResponse(BaseModel):

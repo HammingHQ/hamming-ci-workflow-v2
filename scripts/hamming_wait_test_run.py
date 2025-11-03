@@ -50,10 +50,8 @@ def wait_for_test_run(test_run_id: str, timeout_seconds: int = None) -> TestRunR
         if elapsed > timeout_seconds:
             logger.error(f"Test run timed out after {timeout_seconds} seconds")
             return TestRunResults(
-                testRunId=test_run_id,
-                status="TIMEOUT",
-                calls=[],
-                summary={"error": "Timeout waiting for test completion"}
+                summary={"id": test_run_id, "status": "TIMEOUT", "error": "Timeout waiting for test completion"},
+                results=[]
             )
         
         try:
@@ -62,10 +60,8 @@ def wait_for_test_run(test_run_id: str, timeout_seconds: int = None) -> TestRunR
             if response.status_code == 404:
                 logger.error(f"Test run {test_run_id} not found")
                 return TestRunResults(
-                    testRunId=test_run_id,
-                    status="NOT_FOUND",
-                    calls=[],
-                    summary={"error": "Test run not found"}
+                    summary={"id": test_run_id, "status": "NOT_FOUND", "error": "Test run not found"},
+                    results=[]
                 )
             response.raise_for_status()
             status_data = response.json()
@@ -85,17 +81,9 @@ def wait_for_test_run(test_run_id: str, timeout_seconds: int = None) -> TestRunR
                 results_response = requests.get(results_url, headers=headers)
                 results_response.raise_for_status()
                 results_data = results_response.json()
-                
-                # Map the response to our TestRunResults model
-                return TestRunResults(
-                    testRunId=test_run_id,
-                    status=current_status,
-                    calls=results_data.get("results", []),  # The API returns "results" not "calls"
-                    summary=results_data.get("summary", {}),
-                    totalCalls=len(results_data.get("results", [])),
-                    successfulCalls=sum(1 for r in results_data.get("results", []) if r.get("status") == "COMPLETED"),
-                    failedCalls=sum(1 for r in results_data.get("results", []) if r.get("status") == "FAILED")
-                )
+
+                # Return the API response directly - it matches our TestRunResults model
+                return TestRunResults(**results_data)
             
             # Still running, log progress if available
             if current_status == "RUNNING":
