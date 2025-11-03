@@ -71,9 +71,15 @@ The reusable workflow accepts these inputs:
 | `tag_ids` | No* | Comma-separated tag IDs | `cmc220l4i00zsgn0gvqkvpvxh` |
 | `test_case_ids` | No* | Comma-separated test case IDs | `case-1,case-2` |
 | `timeout_seconds` | No | Max wait time (default: 900) | `1200` |
-| `min_score_threshold` | No | Minimum passing score (default: 0.0) | `0.7` |
+| `min_test_pass_rate` | No | Min test case pass rate 0.0-1.0 (default: 1.0) | `0.8` |
+| `min_assertion_pass_rate` | No | Min assertion pass rate 0.0-1.0 (default: 1.0) | `0.9` |
 
 \* Either `tag_ids` OR `test_case_ids` must be provided (not both)
+
+### Threshold Parameters
+
+- **`min_test_pass_rate`**: Percentage of test cases that must pass (0.0 = 0%, 1.0 = 100%)
+- **`min_assertion_pass_rate`**: Percentage of assertions that must pass across all tests
 
 ## Usage Examples
 
@@ -91,7 +97,7 @@ jobs:
       HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
 ```
 
-### Test Specific Test Cases
+### Test Specific Test Cases with Custom Thresholds
 
 ```yaml
 jobs:
@@ -101,7 +107,8 @@ jobs:
       agent_id: "agent-123"
       phone_numbers: "+15551234567,+15559876543"
       test_case_ids: "test-case-1,test-case-2"
-      min_score_threshold: "0.8"
+      min_test_pass_rate: "0.8"         # 80% of tests must pass
+      min_assertion_pass_rate: "0.9"    # 90% of assertions must pass
     secrets:
       HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
 ```

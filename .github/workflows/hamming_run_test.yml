@@ -26,11 +26,16 @@ on:
         type: string
         default: "900"
         description: "Maximum time to wait for test completion"
-      min_score_threshold:
+      min_test_pass_rate:
         required: false
         type: string
-        default: "0.0"
-        description: "Minimum score threshold for passing"
+        default: "1.0"
+        description: "Minimum test case pass rate (0.0-1.0, default: 1.0 = 100%)"
+      min_assertion_pass_rate:
+        required: false
+        type: string
+        default: "1.0"
+        description: "Minimum assertion pass rate (0.0-1.0, default: 1.0 = 100%)"
     secrets:
       HAMMING_API_KEY:
         required: true
@@ -93,7 +98,8 @@ jobs:
       - name: Check test results
         id: check_results
         env:
-          MIN_SCORE_THRESHOLD: ${{ inputs.min_score_threshold }}
+          MIN_TEST_PASS_RATE: ${{ inputs.min_test_pass_rate }}
+          MIN_ASSERTION_PASS_RATE: ${{ inputs.min_assertion_pass_rate }}
         run: |
           cat results.json | python scripts/hamming_check_results.py
 
