@@ -89,6 +89,8 @@ def run_test(
 
     except Exception as e:
         logger.error(f"Failed to create test run: {e}")
+        import traceback
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise
 
 
@@ -123,6 +125,8 @@ def main():
 
     except Exception as e:
         logger.error(f"Failed to create test run: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
