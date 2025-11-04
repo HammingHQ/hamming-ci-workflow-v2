@@ -91,12 +91,13 @@ class TestCaseResult(BaseModel):
     testCaseId: str
     status: str  # PASSED, FAILED, PENDING, ERROR
     phoneNumber: Optional[str] = None
+    durationSeconds: Optional[int] = None
+    recordingUrl: Optional[str] = None
+    transcriptionDataUrl: Optional[str] = None
+    transcript: Optional[Any] = None  # Can be object or string
     assertions: Optional[AssertionsSummary] = None
     assertionResults: Optional[List[AssertionResult]] = []
     metrics: Optional[TestCaseMetrics] = None
-    transcript: Optional[str] = None
-    duration: Optional[int] = None
-    recordingUrl: Optional[str] = None
 
 
 class AssertionCategory(BaseModel):
