@@ -99,13 +99,29 @@ class TestCaseResult(BaseModel):
     recordingUrl: Optional[str] = None
 
 
+class AssertionCategory(BaseModel):
+    """Assertion category details."""
+    name: str
+    score: Optional[float] = None
+    status: Optional[str] = None  # passed, failed
+    stats: Optional[Dict[str, Any]] = None
+    assertionIds: Optional[List[str]] = None
+
+
+class TestRunAssertionsSummary(BaseModel):
+    """Summary of assertions at test run level."""
+    overallScore: Optional[float] = None
+    categories: Optional[List[AssertionCategory]] = None
+
+
 class TestRunSummary(BaseModel):
     """Summary of a test run."""
     id: str
     status: str
-    totalTests: Optional[int] = None
-    passedTests: Optional[int] = None
-    failedTests: Optional[int] = None
+    stats: Optional[Dict[str, Any]] = None
+    metrics: Optional[Dict[str, Any]] = None
+    assertions: Optional[TestRunAssertionsSummary] = None
+    topIssues: Optional[List[Dict[str, Any]]] = None
 
 
 class TestRunResults(BaseModel):

@@ -67,35 +67,32 @@ def check_results(
         logger.error(f"  ✗ FAIL: Test pass rate below threshold")
         all_checks_passed = False
 
-    # Check 3: Assertion pass rate (using assertions.overallScore)
-    # Collect overallScores from all test cases that have assertions configured
-    assertion_scores = []
-    for result in results:
-        if result.assertions:
-            # Check if assertions are actually configured (not just empty)
-            categories = result.assertions.categories or []
-            overall_score = result.assertions.overallScore or 0.0
+    # Check 3: Assertion pass rate (using summary.assertions.overallScore)
+    if summary.assertions and summary.assertions.overallScore is not None:
+        # Check if assertions are actually configured
+        categories = summary.assertions.categories or []
+        overall_score = summary.assertions.overallScore
 
-            # If overallScore is 0 and no categories, assertions are not configured
-            if overall_score == 0.0 and len(categories) == 0:
-                continue
-
-            assertion_scores.append(overall_score)
-
-    if assertion_scores:
-        # Calculate average assertion score across all test cases with assertions
-        avg_assertion_score = sum(assertion_scores) / len(assertion_scores)
-
-        logger.info(f"\n{'='*60}")
-        logger.info(f"ASSERTION PASS RATE:")
-        logger.info(f"  Average Score: {avg_assertion_score:.1%} (across {len(assertion_scores)} test cases)")
-        logger.info(f"  Threshold: {min_assertion_pass_rate:.1%}")
-
-        if avg_assertion_score >= min_assertion_pass_rate:
-            logger.info(f"  ✓ PASS: Assertion pass rate meets threshold")
+        # If overallScore is 0 and no categories, assertions are not configured
+        if overall_score == 0.0 and len(categories) == 0:
+            logger.info(f"\n{'='*60}")
+            logger.info(f"ASSERTION PASS RATE:")
+            logger.info(f"  No assertions configured for these test cases")
+            logger.info(f"  ✓ SKIP: Assertion check skipped")
         else:
-            logger.error(f"  ✗ FAIL: Assertion pass rate below threshold")
-            all_checks_passed = False
+            # Convert to 0.0-1.0 scale (API returns 0-100)
+            assertion_score = overall_score / 100.0
+
+            logger.info(f"\n{'='*60}")
+            logger.info(f"ASSERTION PASS RATE:")
+            logger.info(f"  Overall Score: {assertion_score:.1%}")
+            logger.info(f"  Threshold: {min_assertion_pass_rate:.1%}")
+
+            if assertion_score >= min_assertion_pass_rate:
+                logger.info(f"  ✓ PASS: Assertion pass rate meets threshold")
+            else:
+                logger.error(f"  ✗ FAIL: Assertion pass rate below threshold")
+                all_checks_passed = False
     else:
         logger.info(f"\n{'='*60}")
         logger.info(f"ASSERTION PASS RATE:")
