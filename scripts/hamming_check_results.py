@@ -67,26 +67,31 @@ def check_results(
         logger.error(f"  ✗ FAIL: Test pass rate below threshold")
         all_checks_passed = False
 
-    # Check 3: Assertion pass rate (across all test cases)
-    total_assertions = 0
-    passed_assertions = 0
-
+    # Check 3: Assertion pass rate (using assertions.overallScore)
+    # Collect overallScores from all test cases that have assertions configured
+    assertion_scores = []
     for result in results:
-        assertion_results = result.assertionResults or []
-        for assertion in assertion_results:
-            total_assertions += 1
-            if assertion.status == "PASSED":
-                passed_assertions += 1
+        if result.assertions:
+            # Check if assertions are actually configured (not just empty)
+            categories = result.assertions.categories or []
+            overall_score = result.assertions.overallScore or 0.0
 
-    if total_assertions > 0:
-        assertion_pass_rate = passed_assertions / total_assertions
+            # If overallScore is 0 and no categories, assertions are not configured
+            if overall_score == 0.0 and len(categories) == 0:
+                continue
+
+            assertion_scores.append(overall_score)
+
+    if assertion_scores:
+        # Calculate average assertion score across all test cases with assertions
+        avg_assertion_score = sum(assertion_scores) / len(assertion_scores)
 
         logger.info(f"\n{'='*60}")
         logger.info(f"ASSERTION PASS RATE:")
-        logger.info(f"  Passed: {passed_assertions}/{total_assertions} ({assertion_pass_rate:.1%})")
+        logger.info(f"  Average Score: {avg_assertion_score:.1%} (across {len(assertion_scores)} test cases)")
         logger.info(f"  Threshold: {min_assertion_pass_rate:.1%}")
 
-        if assertion_pass_rate >= min_assertion_pass_rate:
+        if avg_assertion_score >= min_assertion_pass_rate:
             logger.info(f"  ✓ PASS: Assertion pass rate meets threshold")
         else:
             logger.error(f"  ✗ FAIL: Assertion pass rate below threshold")
@@ -106,11 +111,17 @@ def check_results(
         if result.status == "PASSED":
             logger.info(f"  ✓ {result.id} (testCase: {result.testCaseId}): PASSED")
             logger.info(f"      View test case: {test_case_url}")
+            # Show assertion score if available
+            if result.assertions and result.assertions.overallScore is not None:
+                logger.info(f"      Assertion Score: {result.assertions.overallScore:.1%}")
         else:
             logger.error(f"  ✗ {result.id} (testCase: {result.testCaseId}): {result.status}")
             logger.error(f"      View test case: {test_case_url}")
+            # Show assertion score if available
+            if result.assertions and result.assertions.overallScore is not None:
+                logger.error(f"      Assertion Score: {result.assertions.overallScore:.1%}")
 
-            # Show failed assertions
+            # Show failed assertions from assertionResults
             assertion_results = result.assertionResults or []
             for assertion in assertion_results:
                 if assertion.status == "FAILED":

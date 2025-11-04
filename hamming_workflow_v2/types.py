@@ -71,6 +71,12 @@ class AssertionResult(BaseModel):
     details: Optional[Dict[str, Any]] = None
 
 
+class AssertionsSummary(BaseModel):
+    """Summary of assertions for a test case."""
+    overallScore: Optional[float] = None
+    categories: Optional[List[str]] = None
+
+
 class TestCaseMetrics(BaseModel):
     """Metrics for a test case run."""
     latencyP50: Optional[float] = None
@@ -85,6 +91,7 @@ class TestCaseResult(BaseModel):
     testCaseId: str
     status: str  # PASSED, FAILED, PENDING, ERROR
     phoneNumber: Optional[str] = None
+    assertions: Optional[AssertionsSummary] = None
     assertionResults: Optional[List[AssertionResult]] = []
     metrics: Optional[TestCaseMetrics] = None
     transcript: Optional[str] = None
