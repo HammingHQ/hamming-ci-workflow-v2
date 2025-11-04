@@ -78,8 +78,39 @@ The reusable workflow accepts these inputs:
 
 ### Threshold Parameters
 
-- **`min_test_pass_rate`**: Percentage of test cases that must pass (0.0 = 0%, 1.0 = 100%)
-- **`min_assertion_pass_rate`**: Percentage of assertions that must pass across all tests
+- **`min_test_pass_rate`**: Minimum percentage of test cases that must pass (0.0 = 0%, 1.0 = 100%). Based on test case status (PASSED/FAILED).
+- **`min_assertion_pass_rate`**: Minimum average assertion score across all test cases (0.0 = 0%, 1.0 = 100%). Uses `assertions.overallScore` from each test case. If no assertions are configured, this check is skipped.
+
+## Test Results Output
+
+The workflow outputs a concise summary of test results:
+
+```
+============================================================
+TEST CASE PASS RATE:
+  Passed: 8/10 (80.0%)
+  Threshold: 80.0%
+  ✓ PASS: Test pass rate meets threshold
+
+============================================================
+ASSERTION PASS RATE:
+  Average Score: 92.5% (across 10 test cases)
+  Threshold: 90.0%
+  ✓ PASS: Assertion pass rate meets threshold
+
+============================================================
+FAILED TEST CASES (2):
+  ✗ test-case-abc123: FAILED
+    https://app.hamming.ai/test-cases/test-case-abc123
+  ✗ test-case-def456: FAILED
+    https://app.hamming.ai/test-cases/test-case-def456
+
+============================================================
+
+✓ All checks PASSED
+```
+
+For detailed test results and debugging, click the dashboard links provided for each failed test case.
 
 ## Usage Examples
 
@@ -181,17 +212,25 @@ cp .env.example .env
 ### Running Scripts Locally
 
 ```bash
-# Run a test with tags
+# Set required environment variables
+export HAMMING_API_KEY="your-api-key"
 export AGENT_ID="your-agent-id"
 export PHONE_NUMBERS="+15551234567"
 export TAG_IDS="smoke-test"
+
+# Optional: Set custom thresholds (defaults to 1.0 = 100%)
+export MIN_TEST_PASS_RATE="0.8"        # 80% of test cases must pass
+export MIN_ASSERTION_PASS_RATE="0.9"   # 90% assertion score required
+
+# Run a test
 python scripts/hamming_run_test.py
 
-# Wait for completion (outputs test run ID)
-python scripts/hamming_wait_test_run.py <test-run-id>
+# Wait for completion and get results
+TEST_RUN_ID=$(python scripts/hamming_run_test.py)
+python scripts/hamming_wait_test_run.py $TEST_RUN_ID > results.json
 
-# Check results (pipe from wait script)
-python scripts/hamming_wait_test_run.py <test-run-id> | python scripts/hamming_check_results.py
+# Check results with thresholds
+cat results.json | python scripts/hamming_check_results.py
 ```
 
 ## API Endpoints Used
@@ -251,6 +290,8 @@ Key differences from hamming-ci-workflow v1:
 | Request Format | Flat parameters | Structured `testConfigurations` array |
 | Validation | Minimal | Comprehensive pre-execution |
 | Response | `experiment_id` | Full `testRunId` and results |
+| Thresholds | Single `min_score_threshold` | Separate `min_test_pass_rate` and `min_assertion_pass_rate` |
+| Assertion Checking | Individual assertion results | Average `assertions.overallScore` across test cases |
 
 ## Contributing
 
