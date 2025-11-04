@@ -92,7 +92,10 @@ def check_results(
             logger.error(f"  ✗ FAIL: Assertion pass rate below threshold")
             all_checks_passed = False
     else:
-        logger.info(f"\nNo assertions found to check")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"ASSERTION PASS RATE:")
+        logger.info(f"  No assertions configured for these test cases")
+        logger.info(f"  ✓ SKIP: Assertion check skipped (no assertions to evaluate)")
 
     # Log detailed test case results
     logger.info(f"\n{'='*60}")
