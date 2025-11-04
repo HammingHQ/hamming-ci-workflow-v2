@@ -79,7 +79,7 @@ The reusable workflow accepts these inputs:
 ### Threshold Parameters
 
 - **`min_test_pass_rate`**: Minimum percentage of test cases that must pass (0.0 = 0%, 1.0 = 100%). Based on test case status (PASSED/FAILED).
-- **`min_assertion_pass_rate`**: Minimum average assertion score across all test cases (0.0 = 0%, 1.0 = 100%). Uses `assertions.overallScore` from each test case. If no assertions are configured, this check is skipped.
+- **`min_assertion_pass_rate`**: Minimum assertion score (0.0 = 0%, 1.0 = 100%). Uses `summary.assertions.overallScore` from the API response. If no assertions are configured (overallScore is 0 and no categories), this check is skipped.
 
 ## Test Results Output
 
@@ -94,7 +94,7 @@ TEST CASE PASS RATE:
 
 ============================================================
 ASSERTION PASS RATE:
-  Average Score: 92.5% (across 10 test cases)
+  Overall Score: 92.5%
   Threshold: 90.0%
   ✓ PASS: Assertion pass rate meets threshold
 
@@ -291,7 +291,7 @@ Key differences from hamming-ci-workflow v1:
 | Validation | Minimal | Comprehensive pre-execution |
 | Response | `experiment_id` | Full `testRunId` and results |
 | Thresholds | Single `min_score_threshold` | Separate `min_test_pass_rate` and `min_assertion_pass_rate` |
-| Assertion Checking | Individual assertion results | Average `assertions.overallScore` across test cases |
+| Assertion Checking | Individual assertion results | `summary.assertions.overallScore` from API |
 
 ## Contributing
 
