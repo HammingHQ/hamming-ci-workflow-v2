@@ -100,42 +100,26 @@ def check_results(
         logger.info(f"\n{'='*60}")
         logger.info(f"ASSERTION PASS RATE:")
         logger.info(f"  No assertions configured for these test cases")
-        logger.info(f"  ✓ SKIP: Assertion check skipped (no assertions to evaluate)")
+        logger.info(f"  ✓ SKIP: Assertion check skipped")
 
-    # Log detailed test case results
-    logger.info(f"\n{'='*60}")
-    logger.info(f"DETAILED TEST RESULTS:")
-    for result in results:
-        test_case_url = get_test_case_url(result.testCaseId)
+    # Log failed test cases with links
+    failed_results = [r for r in results if r.status != "PASSED"]
+    if failed_results:
+        logger.info(f"\n{'='*60}")
+        logger.info(f"FAILED TEST CASES ({len(failed_results)}):")
+        for result in failed_results:
+            test_case_url = get_test_case_url(result.testCaseId)
+            logger.error(f"  ✗ {result.testCaseId}: {result.status}")
+            logger.error(f"    {test_case_url}")
 
-        if result.status == "PASSED":
-            logger.info(f"  ✓ {result.id} (testCase: {result.testCaseId}): PASSED")
-            logger.info(f"      View test case: {test_case_url}")
-            # Show assertion score if available
-            if result.assertions and result.assertions.overallScore is not None:
-                logger.info(f"      Assertion Score: {result.assertions.overallScore:.1%}")
-        else:
-            logger.error(f"  ✗ {result.id} (testCase: {result.testCaseId}): {result.status}")
-            logger.error(f"      View test case: {test_case_url}")
-            # Show assertion score if available
-            if result.assertions and result.assertions.overallScore is not None:
-                logger.error(f"      Assertion Score: {result.assertions.overallScore:.1%}")
-
-            # Show failed assertions from assertionResults
-            assertion_results = result.assertionResults or []
-            for assertion in assertion_results:
-                if assertion.status == "FAILED":
-                    logger.error(f"      └─ {assertion.assertionName}: {assertion.reason}")
-
+    # Final summary
     logger.info(f"{'='*60}\n")
-
-    # Final result
     if all_checks_passed:
         logger.info("✓ All checks PASSED")
-        return True
     else:
         logger.error("✗ Some checks FAILED")
-        return False
+
+    return all_checks_passed
 
 
 def main():
