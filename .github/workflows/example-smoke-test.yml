@@ -16,7 +16,8 @@ jobs:
       phone_numbers: ${{ vars.SMOKE_TEST_PHONE_NUMBERS }}  # Repository variable for smoke test
       tag_ids: ${{ vars.SMOKE_TEST_TAGS }}  # Repository variable for smoke test
       timeout_seconds: "900"
-      min_score_threshold: "0.7"
+      min_test_pass_rate: "0.8"        # 80% of test cases must pass
+      min_assertion_pass_rate: "0.9"   # 90% assertion score required
     secrets:
       # This must be a repository secret
       HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}

@@ -71,9 +71,46 @@ The reusable workflow accepts these inputs:
 | `tag_ids` | No* | Comma-separated tag IDs | `cmc220l4i00zsgn0gvqkvpvxh` |
 | `test_case_ids` | No* | Comma-separated test case IDs | `case-1,case-2` |
 | `timeout_seconds` | No | Max wait time (default: 900) | `1200` |
-| `min_score_threshold` | No | Minimum passing score (default: 0.0) | `0.7` |
+| `min_test_pass_rate` | No | Min test case pass rate 0.0-1.0 (default: 1.0) | `0.8` |
+| `min_assertion_pass_rate` | No | Min assertion pass rate 0.0-1.0 (default: 1.0) | `0.9` |
 
 \* Either `tag_ids` OR `test_case_ids` must be provided (not both)
+
+### Threshold Parameters
+
+- **`min_test_pass_rate`**: Minimum percentage of test cases that must pass (0.0 = 0%, 1.0 = 100%). Based on test case status (PASSED/FAILED).
+- **`min_assertion_pass_rate`**: Minimum assertion score (0.0 = 0%, 1.0 = 100%). Uses `summary.assertions.overallScore` from the API response. If no assertions are configured (overallScore is 0 and no categories), this check is skipped.
+
+## Test Results Output
+
+The workflow outputs a concise summary of test results:
+
+```
+Test Run URL: https://app.hamming.ai/test-runs/run-xyz789
+
+============================================================
+TEST CASE PASS RATE:
+  Passed: 8/10 (80.0%)
+  Threshold: 80.0%
+  ✓ PASS: Test pass rate meets threshold
+
+============================================================
+ASSERTION PASS RATE:
+  Overall Score: 92.5%
+  Threshold: 90.0%
+  ✓ PASS: Assertion pass rate meets threshold
+
+============================================================
+FAILED TEST CASES (2):
+  ✗ test-case-abc123: FAILED
+  ✗ test-case-def456: FAILED
+
+============================================================
+
+✓ All checks PASSED
+```
+
+Click the Test Run URL to view detailed results and debug failed test cases in the Hamming dashboard.
 
 ## Usage Examples
 
@@ -91,7 +128,7 @@ jobs:
       HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
 ```
 
-### Test Specific Test Cases
+### Test Specific Test Cases with Custom Thresholds
 
 ```yaml
 jobs:
@@ -101,7 +138,8 @@ jobs:
       agent_id: "agent-123"
       phone_numbers: "+15551234567,+15559876543"
       test_case_ids: "test-case-1,test-case-2"
-      min_score_threshold: "0.8"
+      min_test_pass_rate: "0.8"         # 80% of tests must pass
+      min_assertion_pass_rate: "0.9"    # 90% of assertions must pass
     secrets:
       HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
 ```
@@ -174,26 +212,49 @@ cp .env.example .env
 ### Running Scripts Locally
 
 ```bash
-# Run a test with tags
+# Set required environment variables
+export HAMMING_API_KEY="your-api-key"
 export AGENT_ID="your-agent-id"
 export PHONE_NUMBERS="+15551234567"
 export TAG_IDS="smoke-test"
+
+# Optional: Set custom thresholds (defaults to 1.0 = 100%)
+export MIN_TEST_PASS_RATE="0.8"        # 80% of test cases must pass
+export MIN_ASSERTION_PASS_RATE="0.9"   # 90% assertion score required
+
+# Run a test
 python scripts/hamming_run_test.py
 
-# Wait for completion (outputs test run ID)
-python scripts/hamming_wait_test_run.py <test-run-id>
+# Wait for completion and get results
+TEST_RUN_ID=$(python scripts/hamming_run_test.py)
+python scripts/hamming_wait_test_run.py $TEST_RUN_ID > results.json
 
-# Check results (pipe from wait script)
-python scripts/hamming_wait_test_run.py <test-run-id> | python scripts/hamming_check_results.py
+# Check results with thresholds
+cat results.json | python scripts/hamming_check_results.py
 ```
 
 ## API Endpoints Used
 
 This workflow uses the following Hamming API endpoints:
 
-- `POST /api/rest/test-runs/test-inbound-agent` - Create test run
+- `POST /api/rest/test-runs/test-inbound-agent` - Create test run with configurations array
 - `GET /api/rest/test-runs/{id}/status` - Check test run status
 - `GET /api/rest/test-runs/{id}/results` - Get test results
+
+### API Request Format
+
+The workflow sends requests in this format:
+```json
+{
+  "agentId": "your-agent-id",
+  "phoneNumbers": ["+15551234567"],
+  "testConfigurations": [
+    {"tagId": "your-tag-id"}  // or {"testCaseId": "test-case-id"}
+  ]
+}
+```
+
+**Note:** The API documentation examples show `configurations`, but the actual API expects `testConfigurations`.
 
 ## Troubleshooting
 
@@ -223,11 +284,14 @@ Key differences from hamming-ci-workflow v1:
 
 | Feature | v1 | v2 |
 |---------|----|----|
-| Test Selection | `dataset_id` | `tag_ids` or `test_case_ids` |
-| Phone Numbers | Single `to_number` | Multiple `phone_numbers` |
+| Test Selection | `dataset_id` | `testConfigurations` array with `tagId` or `testCaseId` |
+| Phone Numbers | Single `to_number` | Multiple `phone_numbers` array |
 | API Endpoint | `/voice-agent/{id}/run` | `/test-runs/test-inbound-agent` |
+| Request Format | Flat parameters | Structured `testConfigurations` array |
 | Validation | Minimal | Comprehensive pre-execution |
-| Response | `experiment_id` | Full test run details |
+| Response | `experiment_id` | Full `testRunId` and results |
+| Thresholds | Single `min_score_threshold` | Separate `min_test_pass_rate` and `min_assertion_pass_rate` |
+| Assertion Checking | Individual assertion results | `summary.assertions.overallScore` from API |
 
 ## Contributing
 

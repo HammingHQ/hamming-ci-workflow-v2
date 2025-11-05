@@ -2,110 +2,147 @@
 import json
 import sys
 import logging
-from typing import Optional
 
 # Add parent directory to path for imports
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hamming_workflow_v2.types import TestRunResults
+from hamming_workflow_v2.utils import get_test_run_url
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def check_results(results: TestRunResults, min_score_threshold: float = 0.0) -> bool:
+def check_results(
+    results_dict: dict,
+    min_test_pass_rate: float = 1.0,
+    min_assertion_pass_rate: float = 1.0
+) -> bool:
     """
-    Check test run results and determine if they pass.
-    
+    Check test run results with separate thresholds.
+
     Args:
-        results: The test run results to check
-        min_score_threshold: Minimum score threshold for passing (default: 0.0)
-    
+        results_dict: The test run results as a dictionary
+        min_test_pass_rate: Minimum test case pass rate (0.0-1.0, default: 1.0 = 100%)
+        min_assertion_pass_rate: Minimum assertion pass rate (0.0-1.0, default: 1.0 = 100%)
+
     Returns:
-        True if all checks pass, False otherwise
+        True if all thresholds pass, False otherwise
     """
-    all_passed = True
-    
-    # Check overall status
-    if results.status != "FINISHED":
-        logger.error(f"Test run did not complete successfully. Status: {results.status}")
-        all_passed = False
-    
-    # Check each call
-    for call in results.calls:
-        call_passed = True
-        
-        # Check call status
-        if call.status != "ended":
-            logger.error(f"Call {call.id} has status '{call.status}', expected 'ended'")
-            call_passed = False
-            all_passed = False
-        
-        # Check scores
-        for score_name, score in call.scores.items():
-            if score.value <= min_score_threshold:
-                logger.error(
-                    f"Call {call.id} failed score '{score_name}': {score.value} "
-                    f"(threshold: {min_score_threshold})"
-                )
-                call_passed = False
-                all_passed = False
-            else:
-                logger.info(f"Call {call.id} passed score '{score_name}': {score.value}")
-        
-        if call_passed:
-            logger.info(f"Call {call.id} to {call.phoneNumber} PASSED all checks")
-        else:
-            logger.error(f"Call {call.id} to {call.phoneNumber} FAILED")
-    
-    # Log summary
-    if results.summary:
-        logger.info(f"Test Summary: {json.dumps(results.summary, indent=2)}")
-    
-    # Log final result
-    total_calls = len(results.calls)
-    if all_passed:
-        logger.info(f"✓ All {total_calls} calls passed successfully")
+    # Parse with Pydantic model for type safety
+    try:
+        results_obj = TestRunResults(**results_dict)
+    except Exception as e:
+        logger.error(f"Failed to parse test results: {e}")
+        return False
+
+    summary = results_obj.summary
+    results = results_obj.results
+
+    all_checks_passed = True
+
+    # Log test run URL for reference
+    test_run_url = get_test_run_url(summary.id)
+    logger.info(f"Test Run URL: {test_run_url}")
+
+    # Check 1: Overall test run status
+    if summary.status not in ["COMPLETED", "FINISHED"]:
+        logger.error(f"✗ Test run did not complete successfully. Status: {summary.status}")
+        return False
+
+    total_tests = len(results)
+    if total_tests == 0:
+        logger.error("✗ No test cases found in results")
+        return False
+
+    # Check 2: Test case pass rate
+    passed_tests = sum(1 for r in results if r.status == "PASSED")
+    test_pass_rate = passed_tests / total_tests
+
+    logger.info(f"\n{'='*60}")
+    logger.info(f"TEST CASE PASS RATE:")
+    logger.info(f"  Passed: {passed_tests}/{total_tests} ({test_pass_rate:.1%})")
+    logger.info(f"  Threshold: {min_test_pass_rate:.1%}")
+
+    if test_pass_rate >= min_test_pass_rate:
+        logger.info(f"  ✓ PASS: Test pass rate meets threshold")
     else:
-        failed_calls = sum(1 for call in results.calls if call.status != "ended" or 
-                          any(score.value <= min_score_threshold for score in call.scores.values()))
-        logger.error(f"✗ {failed_calls}/{total_calls} calls failed")
-    
-    return all_passed
+        logger.error(f"  ✗ FAIL: Test pass rate below threshold")
+        all_checks_passed = False
+
+    # Check 3: Assertion pass rate (using summary.assertions.overallScore)
+    if summary.assertions and summary.assertions.overallScore is not None:
+        # Check if assertions are actually configured
+        categories = summary.assertions.categories or []
+        overall_score = summary.assertions.overallScore
+
+        # If overallScore is 0 and no categories, assertions are not configured
+        if overall_score == 0.0 and len(categories) == 0:
+            logger.info(f"\n{'='*60}")
+            logger.info(f"ASSERTION PASS RATE:")
+            logger.info(f"  No assertions configured for these test cases")
+            logger.info(f"  ✓ SKIP: Assertion check skipped")
+        else:
+            # Convert to 0.0-1.0 scale (API returns 0-100)
+            assertion_score = overall_score / 100.0
+
+            logger.info(f"\n{'='*60}")
+            logger.info(f"ASSERTION PASS RATE:")
+            logger.info(f"  Overall Score: {assertion_score:.1%}")
+            logger.info(f"  Threshold: {min_assertion_pass_rate:.1%}")
+
+            if assertion_score >= min_assertion_pass_rate:
+                logger.info(f"  ✓ PASS: Assertion pass rate meets threshold")
+            else:
+                logger.error(f"  ✗ FAIL: Assertion pass rate below threshold")
+                all_checks_passed = False
+    else:
+        logger.info(f"\n{'='*60}")
+        logger.info(f"ASSERTION PASS RATE:")
+        logger.info(f"  No assertions configured for these test cases")
+        logger.info(f"  ✓ SKIP: Assertion check skipped")
+
+    # Log failed test cases
+    failed_results = [r for r in results if r.status != "PASSED"]
+    if failed_results:
+        logger.info(f"\n{'='*60}")
+        logger.info(f"FAILED TEST CASES ({len(failed_results)}):")
+        for result in failed_results:
+            logger.error(f"  ✗ {result.testCaseId}: {result.status}")
+
+    # Final summary
+    logger.info(f"{'='*60}\n")
+    if all_checks_passed:
+        logger.info("✓ All checks PASSED")
+    else:
+        logger.error("✗ Some checks FAILED")
+
+    return all_checks_passed
 
 
 def main():
     """Main entry point for the script."""
     # Check if input is provided via stdin or as argument
     if len(sys.argv) > 1:
-        # Test run ID provided as argument - fetch results first
         logger.error("Direct test run ID not yet implemented. Please pipe results from hamming_wait_test_run.py")
         sys.exit(1)
     else:
         # Read results from stdin (piped from hamming_wait_test_run.py)
         try:
-            input_data = json.load(sys.stdin)
+            results_dict = json.load(sys.stdin)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse input JSON: {e}")
             sys.exit(1)
-    
-    # Parse results
-    try:
-        results = TestRunResults(**input_data)
-    except Exception as e:
-        logger.error(f"Failed to parse test results: {e}")
-        sys.exit(1)
-    
-    # Get threshold from environment or use default
-    min_score_threshold = float(os.environ.get("MIN_SCORE_THRESHOLD", "0.0"))
-    
+
+    # Get thresholds from environment (all should be 0.0 to 1.0)
+    min_test_pass_rate = float(os.environ.get("MIN_TEST_PASS_RATE", "1.0"))  # Default: 100%
+    min_assertion_pass_rate = float(os.environ.get("MIN_ASSERTION_PASS_RATE", "1.0"))  # Default: 100%
+
     # Check results
-    if check_results(results, min_score_threshold):
-        logger.info("All checks passed successfully ✓")
+    if check_results(results_dict, min_test_pass_rate, min_assertion_pass_rate):
         sys.exit(0)
     else:
-        logger.error("Some checks failed ✗")
         sys.exit(1)
 
 

@@ -1,0 +1,18 @@
+name: Test PR
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    uses: ./.github/workflows/hamming_run_test.yml
+    with:
+      agent_id: ${{ vars.SMOKE_TEST_AGENT_ID }}
+      phone_numbers: ${{ vars.SMOKE_TEST_PHONE_NUMBERS }}
+      tag_ids: ${{ vars.SMOKE_TEST_TAGS }}
+      timeout_seconds: "900"
+      min_test_pass_rate: "0.8"
+      min_assertion_pass_rate: "0.9"
+    secrets:
+      HAMMING_API_KEY: ${{ secrets.HAMMING_API_KEY }}
