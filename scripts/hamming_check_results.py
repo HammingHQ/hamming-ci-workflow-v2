@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hamming_workflow_v2.types import TestRunResults
-from hamming_workflow_v2.utils import get_test_case_url
+from hamming_workflow_v2.utils import get_test_run_url
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,6 +41,10 @@ def check_results(
     results = results_obj.results
 
     all_checks_passed = True
+
+    # Log test run URL for reference
+    test_run_url = get_test_run_url(summary.id)
+    logger.info(f"Test Run URL: {test_run_url}")
 
     # Check 1: Overall test run status
     if summary.status not in ["COMPLETED", "FINISHED"]:
@@ -99,15 +103,13 @@ def check_results(
         logger.info(f"  No assertions configured for these test cases")
         logger.info(f"  ✓ SKIP: Assertion check skipped")
 
-    # Log failed test cases with links
+    # Log failed test cases
     failed_results = [r for r in results if r.status != "PASSED"]
     if failed_results:
         logger.info(f"\n{'='*60}")
         logger.info(f"FAILED TEST CASES ({len(failed_results)}):")
         for result in failed_results:
-            test_case_url = get_test_case_url(result.testCaseId)
             logger.error(f"  ✗ {result.testCaseId}: {result.status}")
-            logger.error(f"    {test_case_url}")
 
     # Final summary
     logger.info(f"{'='*60}\n")

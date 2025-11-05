@@ -86,6 +86,8 @@ The reusable workflow accepts these inputs:
 The workflow outputs a concise summary of test results:
 
 ```
+Test Run URL: https://app.hamming.ai/test-runs/run-xyz789
+
 ============================================================
 TEST CASE PASS RATE:
   Passed: 8/10 (80.0%)
@@ -101,16 +103,14 @@ ASSERTION PASS RATE:
 ============================================================
 FAILED TEST CASES (2):
   ✗ test-case-abc123: FAILED
-    https://app.hamming.ai/test-cases/test-case-abc123
   ✗ test-case-def456: FAILED
-    https://app.hamming.ai/test-cases/test-case-def456
 
 ============================================================
 
 ✓ All checks PASSED
 ```
 
-For detailed test results and debugging, click the dashboard links provided for each failed test case.
+Click the Test Run URL to view detailed results and debug failed test cases in the Hamming dashboard.
 
 ## Usage Examples
 
