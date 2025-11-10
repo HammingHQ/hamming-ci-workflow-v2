@@ -69,8 +69,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          set -x
           python -m pip install --upgrade pip
-          pip install -r hamming-ci-workflow-v2/requirements.txt
+          pip install -r "$GITHUB_WORKSPACE/hamming-ci-workflow-v2/requirements.txt"
 
       - name: Validate inputs
         run: |
