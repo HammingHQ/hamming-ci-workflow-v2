@@ -57,7 +57,17 @@ def check_results(
         return False
 
     # Check 2: Test case pass rate
-    passed_tests = sum(1 for r in results if r.status == "PASSED")
+    # A test case is considered passed when it completed execution and all
+    # its assertions passed. The API returns status "COMPLETED" for test
+    # cases that finished running (not "PASSED").
+    def is_test_passed(r) -> bool:
+        if r.status != "COMPLETED":
+            return False
+        if r.assertionResults:
+            return all(a.status == "PASSED" for a in r.assertionResults)
+        return True
+
+    passed_tests = sum(1 for r in results if is_test_passed(r))
     test_pass_rate = passed_tests / total_tests
 
     logger.info(f"\n{'='*60}")
@@ -104,7 +114,7 @@ def check_results(
         logger.info(f"  ✓ SKIP: Assertion check skipped")
 
     # Log failed test cases
-    failed_results = [r for r in results if r.status != "PASSED"]
+    failed_results = [r for r in results if not is_test_passed(r)]
     if failed_results:
         logger.info(f"\n{'='*60}")
         logger.info(f"FAILED TEST CASES ({len(failed_results)}):")

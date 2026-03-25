@@ -17,7 +17,7 @@ class TestStatus(Enum):
 
 class TestCaseStatus(Enum):
     """Individual test case status values."""
-    PASSED = "PASSED"
+    COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     PENDING = "PENDING"
     ERROR = "ERROR"
@@ -89,7 +89,7 @@ class TestCaseResult(BaseModel):
     """Result of a single test case run."""
     id: str
     testCaseId: str
-    status: str  # PASSED, FAILED, PENDING, ERROR
+    status: str  # COMPLETED, FAILED, PENDING, ERROR
     phoneNumber: Optional[str] = None
     durationSeconds: Optional[int] = None
     recordingUrl: Optional[str] = None
