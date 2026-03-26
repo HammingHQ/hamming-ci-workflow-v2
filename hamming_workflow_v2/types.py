@@ -94,6 +94,8 @@ class TestCaseResult(BaseModel):
     id: str
     testCaseId: str
     status: str  # Raw lifecycle status, for example COMPLETED, CANCELLED, or ERROR
+    cancelledBy: Optional[str] = None
+    manuallyEndedBy: Optional[str] = None
     phoneNumber: Optional[str] = None
     durationSeconds: Optional[int] = None
     recordingUrl: Optional[str] = None

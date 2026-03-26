@@ -6,7 +6,8 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.hamming_check_results import check_results  # noqa: E402
+from hamming_workflow_v2.types import TestRunResults  # noqa: E402
+from scripts.hamming_check_results import check_results, count_passed_tests  # noqa: E402
 
 
 def build_results(*, case_results, failed_count=0, assertion_score=100.0):
@@ -46,7 +47,7 @@ def build_results(*, case_results, failed_count=0, assertion_score=100.0):
 
 class CheckResultsTests(unittest.TestCase):
     def test_separates_cancelled_runs_from_completed_passes(self):
-        results = build_results(
+        results_dict = build_results(
             case_results=[
                 {
                     "id": "case-1",
@@ -61,14 +62,40 @@ class CheckResultsTests(unittest.TestCase):
                     "assertionResults": [],
                 },
             ],
-            failed_count=1,
+            failed_count=0,
+            assertion_score=100.0,
+        )
+        results = TestRunResults(**results_dict)
+
+        self.assertEqual(count_passed_tests(results.summary, results.results), 1)
+
+        self.assertTrue(
+            check_results(
+                results_dict,
+                min_test_pass_rate=0.5,
+                min_assertion_pass_rate=1.0,
+            )
+        )
+
+    def test_treats_manual_end_cancelled_rows_as_completed_cases(self):
+        results = build_results(
+            case_results=[
+                {
+                    "id": "case-1",
+                    "testCaseId": "case-1",
+                    "status": "CANCELLED",
+                    "manuallyEndedBy": "user-123",
+                    "assertionResults": [],
+                }
+            ],
+            failed_count=0,
             assertion_score=100.0,
         )
 
         self.assertTrue(
             check_results(
                 results,
-                min_test_pass_rate=0.5,
+                min_test_pass_rate=1.0,
                 min_assertion_pass_rate=1.0,
             )
         )
@@ -127,6 +154,58 @@ class CheckResultsTests(unittest.TestCase):
                 results,
                 min_test_pass_rate=1.0,
                 min_assertion_pass_rate=0.5,
+            )
+        )
+
+    def test_converts_assertion_score_from_percent_to_ratio(self):
+        results = build_results(
+            case_results=[
+                {
+                    "id": "case-1",
+                    "testCaseId": "case-1",
+                    "status": "COMPLETED",
+                    "assertionResults": [],
+                }
+            ],
+            failed_count=0,
+            assertion_score=50.0,
+        )
+
+        self.assertFalse(
+            check_results(
+                results,
+                min_test_pass_rate=1.0,
+                min_assertion_pass_rate=0.75,
+            )
+        )
+
+    def test_error_runs_do_not_count_as_passed_cases(self):
+        results_dict = build_results(
+            case_results=[
+                {
+                    "id": "case-1",
+                    "testCaseId": "case-1",
+                    "status": "COMPLETED",
+                    "assertionResults": [],
+                },
+                {
+                    "id": "case-2",
+                    "testCaseId": "case-2",
+                    "status": "ERROR",
+                    "assertionResults": [],
+                },
+            ],
+            failed_count=0,
+            assertion_score=100.0,
+        )
+        results = TestRunResults(**results_dict)
+
+        self.assertEqual(count_passed_tests(results.summary, results.results), 1)
+        self.assertFalse(
+            check_results(
+                results_dict,
+                min_test_pass_rate=1.0,
+                min_assertion_pass_rate=1.0,
             )
         )
 

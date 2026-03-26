@@ -18,11 +18,8 @@ RAW_COMPLETED_TEST_CASE_STATUSES = {
     TestCaseStatus.COMPLETED.value,
     TestCaseStatus.PASSED.value,
 }
-RAW_FAILED_TEST_CASE_STATUSES = {
-    TestCaseStatus.FAILED.value,
-    TestCaseStatus.CANCELLED.value,
-    TestCaseStatus.CANCELED.value,
-    TestCaseStatus.ENDED.value,
+RAW_ERROR_TEST_CASE_STATUSES = {
+    TestCaseStatus.ERROR.value,
 }
 
 
@@ -37,29 +34,36 @@ def get_failed_test_case_count(summary) -> Optional[int]:
     return None
 
 
+def is_completed_compatibility_row(result) -> bool:
+    """Historical manual-end rows can persist as CANCELLED while still classifying from assertions."""
+    return (
+        result.status in {TestCaseStatus.CANCELLED.value, TestCaseStatus.CANCELED.value}
+        and result.manuallyEndedBy is not None
+    )
+
+
 def count_passed_tests(summary, results) -> int:
     """
     Count passed test cases without collapsing test pass rate into assertion pass rate.
 
     The REST payload returns raw lifecycle statuses such as COMPLETED and CANCELLED.
-    The summary.failed count mixes completed outcome misses with terminal failed
-    lifecycle states, so we subtract only the raw failed lifecycle cases before
-    using the remainder as completed outcome failures.
+    Current summary stats already split true cancellations from outcome failures,
+    while ERROR remains a completed terminal state that should not count as passed.
     """
     completed_tests = sum(
-        1 for result in results if result.status in RAW_COMPLETED_TEST_CASE_STATUSES
+        1
+        for result in results
+        if result.status in RAW_COMPLETED_TEST_CASE_STATUSES
+        or is_completed_compatibility_row(result)
     )
     failed_test_cases = get_failed_test_case_count(summary)
 
     if failed_test_cases is not None:
-        raw_failed_lifecycle_tests = sum(
-            1 for result in results if result.status in RAW_FAILED_TEST_CASE_STATUSES
-        )
-        completed_outcome_failures = max(
+        passed_tests = max(
             0,
-            failed_test_cases - raw_failed_lifecycle_tests,
+            completed_tests - failed_test_cases,
         )
-        return max(0, completed_tests - completed_outcome_failures)
+        return passed_tests
 
     if completed_tests > 0:
         logger.warning(
@@ -162,7 +166,10 @@ def check_results(
 
     # Log non-completed raw failures directly from the payload.
     raw_failed_results = [
-        r for r in results if r.status not in RAW_COMPLETED_TEST_CASE_STATUSES
+        r
+        for r in results
+        if r.status not in RAW_COMPLETED_TEST_CASE_STATUSES
+        and not is_completed_compatibility_row(r)
     ]
     if raw_failed_results:
         logger.info(f"\n{'='*60}")
@@ -170,14 +177,14 @@ def check_results(
         for result in raw_failed_results:
             logger.error(f"  ✗ {result.testCaseId}: {result.status}")
 
+    error_test_cases = sum(
+        1 for result in results if result.status in RAW_ERROR_TEST_CASE_STATUSES
+    )
     failed_test_cases = get_failed_test_case_count(summary)
     if failed_test_cases:
-        raw_failed_lifecycle_count = sum(
-            1 for result in results if result.status in RAW_FAILED_TEST_CASE_STATUSES
-        )
         completed_outcome_failures = max(
             0,
-            failed_test_cases - raw_failed_lifecycle_count,
+            failed_test_cases,
         )
 
         if completed_outcome_failures:
@@ -189,6 +196,8 @@ def check_results(
                 "  Use the Test Run URL above to inspect which completed cases "
                 "failed their expected outcome."
             )
+    if error_test_cases:
+        logger.info(f"  Error test cases (raw ERROR status): {error_test_cases}")
 
     # Final summary
     logger.info(f"{'='*60}\n")
