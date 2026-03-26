@@ -78,7 +78,7 @@ The reusable workflow accepts these inputs:
 
 ### Threshold Parameters
 
-- **`min_test_pass_rate`**: Minimum percentage of test cases that must pass (0.0 = 0%, 1.0 = 100%). Based on test case status (PASSED/FAILED).
+- **`min_test_pass_rate`**: Minimum percentage of test cases that must achieve their expected outcome (0.0 = 0%, 1.0 = 100%). For current REST responses, raw case statuses are lifecycle values like `COMPLETED`, so this workflow uses completed case runs together with `summary.stats.failed` to keep outcome failures separate from assertion-score thresholds.
 - **`min_assertion_pass_rate`**: Minimum assertion score (0.0 = 0%, 1.0 = 100%). Uses `summary.assertions.overallScore` from the API response. If no assertions are configured (overallScore is 0 and no categories), this check is skipped.
 
 ## Test Results Output

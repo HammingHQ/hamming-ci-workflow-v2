@@ -2,6 +2,7 @@
 import json
 import sys
 import logging
+from typing import Optional
 
 # Add parent directory to path for imports
 import os
@@ -12,6 +13,45 @@ from hamming_workflow_v2.utils import get_test_run_url
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def get_failed_outcome_count(summary) -> Optional[int]:
+    """Return API-classified outcome failures when summary stats are present."""
+    stats = summary.stats or {}
+    failed = stats.get("failed")
+
+    if isinstance(failed, int) and failed >= 0:
+        return failed
+
+    return None
+
+
+def count_passed_tests(summary, results) -> int:
+    """
+    Count passed test cases without collapsing test pass rate into assertion pass rate.
+
+    The REST payload returns raw lifecycle statuses such as COMPLETED. Signalspace
+    classifies outcome failures separately in summary.stats.failed, while
+    assertion scoring remains an independent metric.
+    """
+    completed_tests = sum(1 for result in results if result.status == "COMPLETED")
+    legacy_passed_tests = sum(1 for result in results if result.status == "PASSED")
+    failed_outcomes = get_failed_outcome_count(summary)
+
+    if completed_tests > 0 and failed_outcomes is not None:
+        return max(0, completed_tests - failed_outcomes)
+
+    if legacy_passed_tests > 0:
+        return legacy_passed_tests
+
+    if completed_tests > 0:
+        logger.warning(
+            "API returned COMPLETED case statuses without summary.stats.failed; "
+            "treating COMPLETED cases as passed for compatibility."
+        )
+        return completed_tests
+
+    return 0
 
 
 def check_results(
@@ -57,7 +97,7 @@ def check_results(
         return False
 
     # Check 2: Test case pass rate
-    passed_tests = sum(1 for r in results if r.status == "PASSED")
+    passed_tests = count_passed_tests(summary, results)
     test_pass_rate = passed_tests / total_tests
 
     logger.info(f"\n{'='*60}")
@@ -103,13 +143,24 @@ def check_results(
         logger.info(f"  No assertions configured for these test cases")
         logger.info(f"  ✓ SKIP: Assertion check skipped")
 
-    # Log failed test cases
-    failed_results = [r for r in results if r.status != "PASSED"]
-    if failed_results:
+    # Log non-completed raw failures directly from the payload.
+    raw_failed_results = [
+        r for r in results if r.status not in ["PASSED", "COMPLETED"]
+    ]
+    if raw_failed_results:
         logger.info(f"\n{'='*60}")
-        logger.info(f"FAILED TEST CASES ({len(failed_results)}):")
-        for result in failed_results:
+        logger.info(f"FAILED TEST CASES ({len(raw_failed_results)}):")
+        for result in raw_failed_results:
             logger.error(f"  ✗ {result.testCaseId}: {result.status}")
+
+    failed_outcomes = get_failed_outcome_count(summary)
+    if failed_outcomes:
+        logger.info(f"  Outcome-failed test cases (from summary stats): {failed_outcomes}")
+        if not raw_failed_results:
+            logger.info(
+                "  Use the Test Run URL above to inspect which completed cases "
+                "failed their expected outcome."
+            )
 
     # Final summary
     logger.info(f"{'='*60}\n")
