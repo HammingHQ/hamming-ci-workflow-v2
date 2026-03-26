@@ -45,6 +45,34 @@ def build_results(*, case_results, failed_count=0, assertion_score=100.0):
 
 
 class CheckResultsTests(unittest.TestCase):
+    def test_separates_cancelled_runs_from_completed_passes(self):
+        results = build_results(
+            case_results=[
+                {
+                    "id": "case-1",
+                    "testCaseId": "case-1",
+                    "status": "COMPLETED",
+                    "assertionResults": [],
+                },
+                {
+                    "id": "case-2",
+                    "testCaseId": "case-2",
+                    "status": "CANCELLED",
+                    "assertionResults": [],
+                },
+            ],
+            failed_count=1,
+            assertion_score=100.0,
+        )
+
+        self.assertTrue(
+            check_results(
+                results,
+                min_test_pass_rate=0.5,
+                min_assertion_pass_rate=1.0,
+            )
+        )
+
     def test_uses_summary_failed_count_with_completed_statuses(self):
         results = build_results(
             case_results=[

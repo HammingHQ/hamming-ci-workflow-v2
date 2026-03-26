@@ -8,15 +8,26 @@ from typing import Optional
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hamming_workflow_v2.types import TestRunResults
+from hamming_workflow_v2.types import TestRunResults, TestCaseStatus
 from hamming_workflow_v2.utils import get_test_run_url
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+RAW_COMPLETED_TEST_CASE_STATUSES = {
+    TestCaseStatus.COMPLETED.value,
+    TestCaseStatus.PASSED.value,
+}
+RAW_FAILED_TEST_CASE_STATUSES = {
+    TestCaseStatus.FAILED.value,
+    TestCaseStatus.CANCELLED.value,
+    TestCaseStatus.CANCELED.value,
+    TestCaseStatus.ENDED.value,
+}
 
-def get_failed_outcome_count(summary) -> Optional[int]:
-    """Return API-classified outcome failures when summary stats are present."""
+
+def get_failed_test_case_count(summary) -> Optional[int]:
+    """Return the API's failed test-case count when summary stats are present."""
     stats = summary.stats or {}
     failed = stats.get("failed")
 
@@ -30,24 +41,30 @@ def count_passed_tests(summary, results) -> int:
     """
     Count passed test cases without collapsing test pass rate into assertion pass rate.
 
-    The REST payload returns raw lifecycle statuses such as COMPLETED. Signalspace
-    classifies outcome failures separately in summary.stats.failed, while
-    assertion scoring remains an independent metric.
+    The REST payload returns raw lifecycle statuses such as COMPLETED and CANCELLED.
+    The summary.failed count mixes completed outcome misses with terminal failed
+    lifecycle states, so we subtract only the raw failed lifecycle cases before
+    using the remainder as completed outcome failures.
     """
-    completed_tests = sum(1 for result in results if result.status == "COMPLETED")
-    legacy_passed_tests = sum(1 for result in results if result.status == "PASSED")
-    failed_outcomes = get_failed_outcome_count(summary)
+    completed_tests = sum(
+        1 for result in results if result.status in RAW_COMPLETED_TEST_CASE_STATUSES
+    )
+    failed_test_cases = get_failed_test_case_count(summary)
 
-    if completed_tests > 0 and failed_outcomes is not None:
-        return max(0, completed_tests - failed_outcomes)
-
-    if legacy_passed_tests > 0:
-        return legacy_passed_tests
+    if failed_test_cases is not None:
+        raw_failed_lifecycle_tests = sum(
+            1 for result in results if result.status in RAW_FAILED_TEST_CASE_STATUSES
+        )
+        completed_outcome_failures = max(
+            0,
+            failed_test_cases - raw_failed_lifecycle_tests,
+        )
+        return max(0, completed_tests - completed_outcome_failures)
 
     if completed_tests > 0:
         logger.warning(
-            "API returned COMPLETED case statuses without summary.stats.failed; "
-            "treating COMPLETED cases as passed for compatibility."
+            "API returned completed case statuses without summary.stats.failed; "
+            "treating raw completed cases as passed for compatibility."
         )
         return completed_tests
 
@@ -145,7 +162,7 @@ def check_results(
 
     # Log non-completed raw failures directly from the payload.
     raw_failed_results = [
-        r for r in results if r.status not in ["PASSED", "COMPLETED"]
+        r for r in results if r.status not in RAW_COMPLETED_TEST_CASE_STATUSES
     ]
     if raw_failed_results:
         logger.info(f"\n{'='*60}")
@@ -153,10 +170,21 @@ def check_results(
         for result in raw_failed_results:
             logger.error(f"  ✗ {result.testCaseId}: {result.status}")
 
-    failed_outcomes = get_failed_outcome_count(summary)
-    if failed_outcomes:
-        logger.info(f"  Outcome-failed test cases (from summary stats): {failed_outcomes}")
-        if not raw_failed_results:
+    failed_test_cases = get_failed_test_case_count(summary)
+    if failed_test_cases:
+        raw_failed_lifecycle_count = sum(
+            1 for result in results if result.status in RAW_FAILED_TEST_CASE_STATUSES
+        )
+        completed_outcome_failures = max(
+            0,
+            failed_test_cases - raw_failed_lifecycle_count,
+        )
+
+        if completed_outcome_failures:
+            logger.info(
+                "  Outcome-failed completed test cases (derived from summary stats): "
+                f"{completed_outcome_failures}"
+            )
             logger.info(
                 "  Use the Test Run URL above to inspect which completed cases "
                 "failed their expected outcome."
