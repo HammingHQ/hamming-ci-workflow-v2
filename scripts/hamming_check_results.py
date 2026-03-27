@@ -2,16 +2,77 @@
 import json
 import sys
 import logging
+from typing import Optional
 
 # Add parent directory to path for imports
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hamming_workflow_v2.types import TestRunResults
+from hamming_workflow_v2.types import TestRunResults, TestCaseStatus
 from hamming_workflow_v2.utils import get_test_run_url
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+RAW_COMPLETED_TEST_CASE_STATUSES = {
+    TestCaseStatus.COMPLETED.value,
+    TestCaseStatus.PASSED.value,
+}
+RAW_ERROR_TEST_CASE_STATUSES = {
+    TestCaseStatus.ERROR.value,
+}
+
+
+def get_failed_test_case_count(summary) -> Optional[int]:
+    """Return the API's failed test-case count when summary stats are present."""
+    stats = summary.stats or {}
+    failed = stats.get("failed")
+
+    if isinstance(failed, int) and failed >= 0:
+        return failed
+
+    return None
+
+
+def is_completed_compatibility_row(result) -> bool:
+    """Historical manual-end rows can persist as CANCELLED while still classifying from assertions."""
+    return (
+        result.status in {TestCaseStatus.CANCELLED.value, TestCaseStatus.CANCELED.value}
+        and result.manuallyEndedBy is not None
+    )
+
+
+def count_passed_tests(summary, results) -> int:
+    """
+    Count passed test cases without collapsing test pass rate into assertion pass rate.
+
+    The REST payload returns raw lifecycle statuses such as COMPLETED and CANCELLED.
+    Current summary stats already split true cancellations from outcome failures,
+    while ERROR remains a completed terminal state that should not count as passed.
+    """
+    completed_tests = sum(
+        1
+        for result in results
+        if result.status in RAW_COMPLETED_TEST_CASE_STATUSES
+        or is_completed_compatibility_row(result)
+    )
+    failed_test_cases = get_failed_test_case_count(summary)
+
+    if failed_test_cases is not None:
+        passed_tests = max(
+            0,
+            completed_tests - failed_test_cases,
+        )
+        return passed_tests
+
+    if completed_tests > 0:
+        logger.warning(
+            "API returned completed case statuses without summary.stats.failed; "
+            "treating raw completed cases as passed for compatibility."
+        )
+        return completed_tests
+
+    return 0
 
 
 def check_results(
@@ -57,7 +118,7 @@ def check_results(
         return False
 
     # Check 2: Test case pass rate
-    passed_tests = sum(1 for r in results if r.status == "PASSED")
+    passed_tests = count_passed_tests(summary, results)
     test_pass_rate = passed_tests / total_tests
 
     logger.info(f"\n{'='*60}")
@@ -103,13 +164,40 @@ def check_results(
         logger.info(f"  No assertions configured for these test cases")
         logger.info(f"  ✓ SKIP: Assertion check skipped")
 
-    # Log failed test cases
-    failed_results = [r for r in results if r.status != "PASSED"]
-    if failed_results:
+    # Log non-completed raw failures directly from the payload.
+    raw_failed_results = [
+        r
+        for r in results
+        if r.status not in RAW_COMPLETED_TEST_CASE_STATUSES
+        and not is_completed_compatibility_row(r)
+    ]
+    if raw_failed_results:
         logger.info(f"\n{'='*60}")
-        logger.info(f"FAILED TEST CASES ({len(failed_results)}):")
-        for result in failed_results:
+        logger.info(f"FAILED TEST CASES ({len(raw_failed_results)}):")
+        for result in raw_failed_results:
             logger.error(f"  ✗ {result.testCaseId}: {result.status}")
+
+    error_test_cases = sum(
+        1 for result in results if result.status in RAW_ERROR_TEST_CASE_STATUSES
+    )
+    failed_test_cases = get_failed_test_case_count(summary)
+    if failed_test_cases:
+        completed_outcome_failures = max(
+            0,
+            failed_test_cases,
+        )
+
+        if completed_outcome_failures:
+            logger.info(
+                "  Outcome-failed completed test cases (derived from summary stats): "
+                f"{completed_outcome_failures}"
+            )
+            logger.info(
+                "  Use the Test Run URL above to inspect which completed cases "
+                "failed their expected outcome."
+            )
+    if error_test_cases:
+        logger.info(f"  Error test cases (raw ERROR status): {error_test_cases}")
 
     # Final summary
     logger.info(f"{'='*60}\n")

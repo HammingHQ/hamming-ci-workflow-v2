@@ -16,9 +16,13 @@ class TestStatus(Enum):
 
 
 class TestCaseStatus(Enum):
-    """Individual test case status values."""
+    """Common raw lifecycle statuses returned for case runs."""
+    COMPLETED = "COMPLETED"
     PASSED = "PASSED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    CANCELED = "CANCELED"
+    ENDED = "ENDED"
     PENDING = "PENDING"
     ERROR = "ERROR"
 
@@ -89,7 +93,9 @@ class TestCaseResult(BaseModel):
     """Result of a single test case run."""
     id: str
     testCaseId: str
-    status: str  # PASSED, FAILED, PENDING, ERROR
+    status: str  # Raw lifecycle status, for example COMPLETED, CANCELLED, or ERROR
+    cancelledBy: Optional[str] = None
+    manuallyEndedBy: Optional[str] = None
     phoneNumber: Optional[str] = None
     durationSeconds: Optional[int] = None
     recordingUrl: Optional[str] = None
