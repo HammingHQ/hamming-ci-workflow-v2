@@ -23,6 +23,16 @@ RAW_ERROR_TEST_CASE_STATUSES = {
 }
 
 
+def write_github_outputs(**values):
+    """Pass counts to later workflow steps, such as the PR comment."""
+    output_path = os.environ.get("GITHUB_OUTPUT")
+    if not output_path:
+        return
+    with open(output_path, "a") as f:
+        for key, value in values.items():
+            f.write(f"{key}={value}\n")
+
+
 def get_failed_test_case_count(summary) -> Optional[int]:
     """Return the API's failed test-case count when summary stats are present."""
     stats = summary.stats or {}
@@ -120,6 +130,7 @@ def check_results(
     # Check 2: Test case pass rate
     passed_tests = count_passed_tests(summary, results)
     test_pass_rate = passed_tests / total_tests
+    write_github_outputs(passed_tests=passed_tests, total_tests=total_tests)
 
     logger.info(f"\n{'='*60}")
     logger.info(f"TEST CASE PASS RATE:")
@@ -147,6 +158,7 @@ def check_results(
         else:
             # Convert to 0.0-1.0 scale (API returns 0-100)
             assertion_score = overall_score / 100.0
+            write_github_outputs(assertion_score=f"{assertion_score:.1%}")
 
             logger.info(f"\n{'='*60}")
             logger.info(f"ASSERTION PASS RATE:")

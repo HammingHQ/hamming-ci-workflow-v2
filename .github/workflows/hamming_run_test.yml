@@ -123,31 +123,40 @@ jobs:
           path: results.json
 
       - name: Comment on PR (if applicable)
-        if: github.event_name == 'pull_request'
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.run_test.outputs.test_run_id != '' }}
         uses: actions/github-script@v7
+        env:
+          PASSED_TESTS: ${{ steps.check_results.outputs.passed_tests }}
+          TOTAL_TESTS: ${{ steps.check_results.outputs.total_tests }}
+          ASSERTION_SCORE: ${{ steps.check_results.outputs.assertion_score }}
         with:
           script: |
             const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('results.json', 'utf8'));
+            let results = {};
+            try {
+              results = JSON.parse(fs.readFileSync('results.json', 'utf8'));
+            } catch (e) {} // no results.json when the wait step failed; the link falls back to the app URL
             const testRunId = '${{ steps.run_test.outputs.test_run_id }}';
             const status = '${{ steps.check_results.outcome }}';
+            const { PASSED_TESTS, TOTAL_TESTS, ASSERTION_SCORE } = process.env;
             
-            const totalCalls = results.calls ? results.calls.length : 0;
-            const passedCalls = results.calls ? results.calls.filter(c => c.status === 'ended').length : 0;
+            const [statusEmoji, statusText] =
+              status === 'success' ? ['✅', 'PASSED']
+              : status === 'failure' || results.summary?.status === 'FAILED' ? ['❌', 'FAILED'] // a FAILED run makes the wait step exit 1, so the check is skipped
+              : ['⚠️', 'DID NOT COMPLETE'];
+            const lines = [
+              `## ${statusEmoji} Hamming Voice Test Results`,
+              '',
+              `**Test Run ID:** ${testRunId}`,
+              `**Status:** ${statusText}`,
+            ];
+            if (TOTAL_TESTS) lines.push(`**Test cases:** ${PASSED_TESTS}/${TOTAL_TESTS} passed`);
+            if (ASSERTION_SCORE) lines.push(`**Assertion score:** ${ASSERTION_SCORE}`);
+            lines.push('', `[View detailed results](${results.resultsUrl || 'https://app.hamming.ai/test-runs/' + testRunId})`);
             
-            const statusEmoji = status === 'success' ? '✅' : '❌';
-            const comment = `## ${statusEmoji} Hamming Voice Test Results
-            
-            **Test Run ID:** ${testRunId}
-            **Status:** ${status === 'success' ? 'PASSED' : 'FAILED'}
-            **Calls:** ${passedCalls}/${totalCalls} completed successfully
-            
-            [View detailed results](${results.resultsUrl || 'https://app.hamming.ai/test-runs/' + testRunId})
-            `;
-            
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: comment
+              body: lines.join('\n')
             });
