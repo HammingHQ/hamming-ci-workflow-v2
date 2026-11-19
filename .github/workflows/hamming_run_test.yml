@@ -141,7 +141,9 @@ jobs:
             const { PASSED_TESTS, TOTAL_TESTS, ASSERTION_SCORE } = process.env;
             
             const [statusEmoji, statusText] =
-              status === 'success' ? ['✅', 'PASSED'] : status === 'failure' ? ['❌', 'FAILED'] : ['⚠️', 'DID NOT COMPLETE'];
+              status === 'success' ? ['✅', 'PASSED']
+              : status === 'failure' || results.summary?.status === 'FAILED' ? ['❌', 'FAILED'] // a FAILED run makes the wait step exit 1, so the check is skipped
+              : ['⚠️', 'DID NOT COMPLETE'];
             const lines = [
               `## ${statusEmoji} Hamming Voice Test Results`,
               '',
