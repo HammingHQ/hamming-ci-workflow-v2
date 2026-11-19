@@ -1,6 +1,9 @@
+import os
 import pathlib
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -229,6 +232,29 @@ class CheckResultsTests(unittest.TestCase):
                 min_test_pass_rate=1.0,
                 min_assertion_pass_rate=1.0,
             )
+        )
+
+    def test_writes_counts_for_the_pr_comment(self):
+        results = build_results(
+            case_results=[
+                {"id": "case-1", "testCaseId": "case-1", "status": "COMPLETED"},
+                {"id": "case-2", "testCaseId": "case-2", "status": "COMPLETED"},
+                {"id": "case-3", "testCaseId": "case-3", "status": "ERROR"},
+            ],
+            failed_count=1,
+            assertion_score=75.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = os.path.join(tmp, "github_output")
+            with mock.patch.dict(os.environ, {"GITHUB_OUTPUT": output_path}):
+                self.assertFalse(check_results(results))
+            with open(output_path) as f:
+                outputs = dict(line.split("=", 1) for line in f.read().splitlines())
+
+        self.assertEqual(
+            outputs,
+            {"passed_tests": "1", "total_tests": "3", "assertion_score": "75.0%"},
         )
 
 
